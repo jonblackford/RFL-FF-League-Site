@@ -1,0 +1,251 @@
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { createPinia, setActivePinia } from "pinia";
+import { getLeagueKey, useStore } from "../src/store/store.ts";
+
+const createStorageMock = () => {
+  const storage = new Map();
+  return {
+    getItem: vi.fn((key) => (storage.has(key) ? storage.get(key) : null)),
+    setItem: vi.fn((key, value) => storage.set(key, String(value))),
+    removeItem: vi.fn((key) => storage.delete(key)),
+    clear: vi.fn(() => storage.clear()),
+    key: vi.fn((index) => Array.from(storage.keys())[index] ?? null),
+    get length() {
+      return storage.size;
+    },
+  };
+};
+
+const buildLeague = (leagueId) => ({
+  name: "League",
+  regularSeasonLength: 14,
+  medianScoring: 0,
+  totalRosters: 2,
+  season: "2025",
+  seasonType: "Redraft",
+  leagueId,
+  leagueWinner: null,
+  legacyWinner: 0,
+  lastUpdated: 0,
+  previousLeagueId: null,
+  lastScoredWeek: 14,
+  winnersBracket: [],
+  losersBracket: [],
+  users: [
+    {
+      id: "u1",
+      avatar: "",
+      name: "Manager One",
+      username: "manager1",
+    },
+  ],
+  rosters: [
+    {
+      id: "u1",
+      pointsFor: 100,
+      pointsAgainst: 90,
+      potentialPoints: 110,
+      managerEfficiency: 0.91,
+      wins: 1,
+      losses: 0,
+      ties: 0,
+      rosterId: 1,
+      recordByWeek: "W",
+      players: ["p1"],
+    },
+    {
+      id: "u2",
+      pointsFor: 90,
+      pointsAgainst: 100,
+      potentialPoints: 105,
+      managerEfficiency: 0.86,
+      wins: 0,
+      losses: 1,
+      ties: 0,
+      rosterId: 2,
+      recordByWeek: "L",
+      players: ["p2"],
+    },
+  ],
+  weeklyPoints: [],
+  transactions: {},
+  trades: [],
+  waivers: [],
+  previousLeagues: [],
+  status: "in_season",
+  currentWeek: 1,
+  scoringType: 1,
+  rosterPositions: ["QB"],
+  playoffTeams: 4,
+  playoffType: 1,
+  draftId: "draft-1",
+  waiverType: 2,
+  sport: "nfl",
+});
+
+beforeEach(() => {
+  setActivePinia(createPinia());
+  Object.defineProperty(globalThis, "localStorage", {
+    value: createStorageMock(),
+    configurable: true,
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("main store", () => {
+  test("shows every optional league feature by default", () => {
+    const store = useStore();
+
+    expect(store.hiddenLeagueFeatures).toEqual([]);
+    expect(store.isLeagueFeatureVisible("Expected Wins")).toBe(true);
+  });
+
+  test("persists hidden optional features and keeps roster management visible", () => {
+    const store = useStore();
+    store.currentTab = "Trade Lab";
+
+    store.updateLeagueFeatureVisibility("Trade Lab", false);
+    store.updateLeagueFeatureVisibility("Roster Management", false);
+
+    expect(store.isLeagueFeatureVisible("Trade Lab")).toBe(false);
+    expect(store.isLeagueFeatureVisible("Roster Management")).toBe(true);
+    expect(store.currentTab).toBe("Standings");
+    expect(localStorage.setItem).toHaveBeenCalledWith(
+      "hiddenLeagueFeatures",
+      JSON.stringify(["Trade Lab"])
+    );
+    expect(localStorage.setItem).toHaveBeenCalledWith(
+      "currentTab",
+      "Standings"
+    );
+  });
+
+  test("resets hidden league features to the default", () => {
+    const store = useStore();
+    store.updateLeagueFeatureVisibility("Expected Wins", false);
+
+    store.resetLeagueFeatureVisibility();
+
+    expect(store.hiddenLeagueFeatures).toEqual([]);
+    expect(store.isLeagueFeatureVisible("Expected Wins")).toBe(true);
+    expect(localStorage.removeItem).toHaveBeenCalledWith(
+      "hiddenLeagueFeatures"
+    );
+  });
+
+  test("updateLeagueInfo replaces duplicate league ids", () => {
+    const store = useStore();
+    const league = buildLeague("league-1");
+
+    store.updateLeagueInfo(league);
+    store.updateLeagueInfo({ ...league, name: "Duplicate Name" });
+
+    expect(store.leagueInfo).toHaveLength(1);
+    expect(store.leagueInfo[0].name).toBe("Duplicate Name");
+  });
+
+  test("addProjectionData updates only the targeted roster", () => {
+    const store = useStore();
+    const league = buildLeague("league-1");
+    store.updateLeagueInfo(league);
+
+    store.addProjectionData(
+      getLeagueKey(league),
+      "u2",
+      [{ projection: 22.4, position: "RB" }],
+      8
+    );
+
+    const updatedLeague = store.leagueInfo[0];
+    const roster1 = updatedLeague.rosters.find((r) => r.id === "u1");
+    const roster2 = updatedLeague.rosters.find((r) => r.id === "u2");
+
+    expect(roster1?.projections).toBeUndefined();
+    expect(roster2?.projections).toEqual([{ projection: 22.4, position: "RB" }]);
+    expect(roster2?.projectionStartWeek).toBe(8);
+  });
+
+  test("stores premium weekly reports separately by week", () => {
+    const store = useStore();
+    const league = buildLeague("league-1");
+    const report = (headline) => ({
+      frontPage: { headline, subheadline: "Subheadline", lead: "Lead" },
+      matchupReports: [],
+      teamOfTheWeek: {
+        teamName: "Team One",
+        pointsScored: 120,
+        headline: "Team headline",
+        analysis: "Team analysis",
+      },
+      weeklyLowlights: { headline: "Weekly Lowlights", entries: [] },
+    });
+
+    store.updateLeagueInfo(league);
+    store.addPremiumWeeklyReport(getLeagueKey(league), 7, report("Week 7"));
+    store.addPremiumWeeklyReport(getLeagueKey(league), 14, report("Week 14"));
+
+    expect(store.leagueInfo[0].premiumWeeklyReports[7].frontPage.headline).toBe(
+      "Week 7"
+    );
+    expect(store.leagueInfo[0].premiumWeeklyReports[14].frontPage.headline).toBe(
+      "Week 14"
+    );
+  });
+
+  test("preserves premium weekly reports when league data refreshes", () => {
+    const store = useStore();
+    const league = buildLeague("league-1");
+    const report = {
+      frontPage: {
+        headline: "Saved report",
+        subheadline: "Subheadline",
+        lead: "Lead",
+      },
+      matchupReports: [],
+      teamOfTheWeek: {
+        teamName: "Team One",
+        pointsScored: 120,
+        headline: "Team headline",
+        analysis: "Team analysis",
+      },
+      weeklyLowlights: { headline: "Weekly Lowlights", entries: [] },
+    };
+
+    store.updateLeagueInfo(league);
+    store.addPremiumWeeklyReport(getLeagueKey(league), 7, report);
+    store.updateLeagueInfo({
+      ...buildLeague("league-1"),
+      name: "Refreshed League",
+      lastUpdated: league.lastUpdated + 1,
+    });
+
+    expect(store.leagueInfo[0].name).toBe("Refreshed League");
+    expect(store.leagueInfo[0].premiumWeeklyReports[7]).toEqual(
+      report
+    );
+  });
+
+  test("stores rivalry reports and preserves them when league data refreshes", () => {
+    const store = useStore();
+    const league = buildLeague("league-1");
+
+    store.updateLeagueInfo(league);
+    store.addRivalryReport(
+      getLeagueKey(league),
+      "manager-a:manager-b",
+      "A storied rivalry"
+    );
+    store.updateLeagueInfo({
+      ...buildLeague("league-1"),
+      name: "Refreshed League",
+      lastUpdated: league.lastUpdated + 1,
+    });
+
+    expect(store.leagueInfo[0].rivalryReports).toEqual({
+      "manager-a:manager-b": "A storied rivalry",
+    });
+  });
+});

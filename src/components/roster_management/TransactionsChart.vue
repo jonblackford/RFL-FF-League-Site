@@ -1,0 +1,320 @@
+<script setup lang="ts">
+import { computed, onMounted, shallowRef, ref, watch } from "vue";
+import { useStore } from "../../store/store";
+import type { WeeklyWaiver } from "../../types/apiTypes";
+import Card from "../ui/card/Card.vue";
+import { mobileCategoricalChartResponsive } from "@/lib/chartResponsive";
+import { getChartTheme, getChartTooltipTheme } from "@/lib/chartTheme";
+import {
+  loadDemoLeague,
+  loadDemoRosterManagement,
+  type DemoLeagueFixtures,
+  type DemoRosterManagementFixtures,
+} from "@/data/demo/loaders";
+
+const store = useStore();
+const demoUsers = shallowRef<DemoLeagueFixtures["fakeUsers"]>([]);
+const demoTransactions = shallowRef<
+  DemoRosterManagementFixtures["fakeTransactions"]
+>([]);
+
+onMounted(async () => {
+  if (store.currentLeague) return;
+  const [league, rosterManagement] = await Promise.all([
+    loadDemoLeague(),
+    loadDemoRosterManagement(),
+  ]);
+  demoUsers.value = league.fakeUsers;
+  demoTransactions.value = rosterManagement.fakeTransactions;
+  updateChartColor();
+});
+
+const transactionData = computed(() => {
+  const currentLeague = store.currentLeague;
+  if (currentLeague) {
+    type TradeAsWaiver = Pick<
+      WeeklyWaiver,
+      "adds" | "draft_picks" | "waiver_budget" | "status" | "type"
+    > & { roster_ids: number[] };
+    const trades: TradeAsWaiver[] = [];
+    currentLeague.trades.forEach((trade) => {
+      trade.roster_ids.forEach((id: number) => {
+        trades.push({
+          adds: trade.adds,
+          draft_picks: trade.draft_picks,
+          waiver_budget: trade.waiver_budget,
+          status: trade.status,
+          type: trade.type,
+          roster_ids: [id],
+        });
+      });
+    });
+
+    const allMoves: TradeAsWaiver[] = [
+      ...(currentLeague.waivers || []),
+      ...trades,
+    ];
+
+    const groupedMoves = allMoves
+      .filter(
+        (item) =>
+          (item.status === "complete" && item.adds) ||
+          (item.type === "trade" &&
+            item.status === "complete" &&
+            (item.adds || item.draft_picks || item.waiver_budget))
+      )
+      .reduce<Record<string, Record<string, number>>>((acc, item) => {
+        const creatorId = item.roster_ids[0];
+        const type = item.type;
+
+        if (!acc[creatorId]) {
+          acc[creatorId] = {};
+        }
+
+        acc[creatorId][type] = (acc[creatorId][type] || 0) + 1;
+
+        return acc;
+      }, {});
+
+    const creatorTotals = Object.entries(groupedMoves).map(
+      ([creatorId, types]) => {
+        const total = Object.values(types as Record<string, number>).reduce(
+          (sum, count) => sum + count,
+          0
+        );
+        return { creatorId, total };
+      }
+    );
+
+    creatorTotals.sort((a, b) => a.total - b.total);
+
+    const sortedCategories = creatorTotals.map((entry) => entry.creatorId);
+
+    const categories = sortedCategories;
+
+    const transactionTypes = ["waiver", "free_agent", "trade"];
+
+    const series = transactionTypes.map((type) => {
+      return {
+        name: formatTypeName(type),
+        data: categories.map((creatorId) => {
+          return groupedMoves[creatorId]?.[type] || 0;
+        }),
+      };
+    });
+
+    function formatTypeName(type: string): string {
+      switch (type) {
+        case "waiver":
+          return "Waiver Claims";
+        case "free_agent":
+          return "Free Agents";
+        case "trade":
+          return "Trades";
+        default:
+          return type
+            .split("_")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+      }
+    }
+
+    return { series, categories };
+  } else {
+    return {
+      series: demoTransactions.value,
+      categories: demoUsers.value.map((user) => user.username),
+    };
+  }
+});
+
+watch(
+  [
+    () => store.darkMode,
+    () => store.currentLeagueId,
+    () => store.showUsernames,
+  ],
+  () => updateChartColor()
+);
+const getNameFromId = (rosterId: string) => {
+  const currentLeague = store.currentLeague;
+  if (currentLeague) {
+    const rosterObj = currentLeague.rosters.find(
+      (roster) => roster.rosterId === Number(rosterId)
+    );
+    if (rosterObj) {
+      const userObj = currentLeague.users.find(
+        (user) => user.id == rosterObj.id
+      );
+      if (!userObj) return "Ghost Roster";
+      return store.showUsernames ? userObj?.username : userObj?.name;
+    }
+  } else return rosterId;
+};
+const updateChartColor = () => {
+  chartOptions.value = {
+    ...chartOptions.value,
+    chart: {
+      type: "bar",
+      stacked: true,
+      foreColor: getChartTheme().foreground,
+      toolbar: {
+        show: false,
+      },
+      zoom: {
+        enabled: false,
+      },
+      animations: {
+        enabled: false,
+      },
+    },
+    tooltip: {
+      theme: getChartTooltipTheme(store.darkMode),
+      y: {
+        show: true,
+        formatter: (x: number) => {
+          if (Number.isInteger(x)) {
+            return `${x}`;
+          }
+          return `${x.toFixed(2)}`;
+        },
+      },
+      marker: {
+        show: false,
+      },
+    },
+    xaxis: {
+      categories: transactionData.value.categories.map((id) =>
+        getNameFromId(id)
+      ),
+      tickAmount: transactionData.value.categories.length - 1,
+      hideOverlappingLabels: false,
+      labels: {
+        formatter: function (str: string) {
+          const n = 17;
+          return str.length > n ? str.slice(0, n - 1) + "..." : str;
+        },
+      },
+      title: {
+        text: "League Manager",
+        offsetY: -5,
+        style: {
+          fontSize: "16px",
+          fontFamily:
+            "ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji",
+          fontWeight: 600,
+        },
+      },
+    },
+    yaxis: {
+      title: {
+        text: "Number of Transactions",
+        offsetX: -10,
+        style: {
+          fontSize: "16px",
+          fontFamily:
+            "ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji",
+          fontWeight: 600,
+        },
+      },
+    },
+  };
+};
+
+const chartOptions = ref({
+  responsive: mobileCategoricalChartResponsive(),
+  chart: {
+    foreColor: getChartTheme().foreground,
+    type: "bar",
+    stacked: true,
+    toolbar: {
+      show: false,
+    },
+    zoom: {
+      enabled: false,
+    },
+    animations: {
+      enabled: false,
+    },
+  },
+  plotOptions: {
+    bar: {
+      columnWidth: "75%",
+    },
+  },
+  colors: ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))"],
+  dataLabels: {
+    enabled: false,
+  },
+  tooltip: {
+    theme: getChartTooltipTheme(store.darkMode),
+    y: {
+      show: true,
+      formatter: (x: number) => {
+        if (Number.isInteger(x)) {
+          return `${x}`;
+        }
+        return `${x.toFixed(2)}`;
+      },
+    },
+    marker: {
+      show: false,
+    },
+  },
+  xaxis: {
+    categories: transactionData.value.categories.map((id) => getNameFromId(id)),
+    tickAmount: transactionData.value.categories.length - 1,
+    hideOverlappingLabels: false,
+    labels: {
+      formatter: function (str: string) {
+        const n = 17;
+        return str.length > n ? str.slice(0, n - 1) + "..." : str;
+      },
+    },
+    title: {
+      text: "League Manager",
+      offsetY: -5,
+      style: {
+        fontSize: "16px",
+        fontFamily:
+          "ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji",
+        fontWeight: 600,
+      },
+    },
+  },
+  yaxis: {
+    title: {
+      text: "Number of Transactions",
+      offsetX: -10,
+      style: {
+        fontSize: "16px",
+        fontFamily:
+          "ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji",
+        fontWeight: 600,
+      },
+    },
+  },
+});
+</script>
+<template>
+  <Card class="w-full min-w-0 p-4 md:p-6">
+    <div class="flex justify-between">
+      <div>
+        <h1 class="pb-2 text-2xl font-semibold tracking-tight">
+          League Transactions
+        </h1>
+      </div>
+    </div>
+    <apexchart
+      width="100%"
+      height="475"
+      type="bar"
+      :options="chartOptions"
+      :series="transactionData.series"
+    ></apexchart>
+    <p class="mt-6 text-xs sm:-mb-4 text-muted-foreground">
+      Transactions are roster changing moves which include: waiver claims, free
+      agent additions, and trades.
+    </p>
+  </Card>
+</template>

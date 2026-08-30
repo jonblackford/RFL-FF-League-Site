@@ -1,0 +1,467 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, shallowRef, watch } from "vue";
+import { maxBy, sum } from "@/lib/collection";
+import { getLeagueKey, useStore } from "../../store/store";
+import {
+  RosterType,
+  LeagueInfoType,
+  TableDataType,
+  PlayoffProjection,
+} from "../../types/types";
+import { getProjections } from "../../api/sleeperApi";
+import Card from "../ui/card/Card.vue";
+import { formatOrdinal } from "@/lib/format";
+import {
+  loadDemoPlayoffs,
+  type DemoPlayoffFixtures,
+} from "@/data/demo/loaders";
+const store = useStore();
+const loading = ref(false);
+const playoffOdds = ref<PlayoffProjection[]>([]);
+const showData = ref(false);
+const demoPlayoffData = shallowRef<
+  DemoPlayoffFixtures["fakePlayoffData"]
+>([]);
+
+const props = defineProps<{
+  propsTableData: TableDataType[];
+}>();
+
+onMounted(async () => {
+  if (store.leagueInfo.length !== 0) return;
+  const { fakePlayoffData } = await loadDemoPlayoffs();
+  demoPlayoffData.value = fakePlayoffData;
+});
+
+const hasProjectionData = (league: LeagueInfoType) =>
+  league.rosters.every(
+    (roster) => roster.projections && roster.projections.length > 0
+  );
+
+onMounted(async () => {
+  showData.value = showPlayoffOdds.value;
+  if (
+    store.leagueInfo.length > 0 &&
+    !store.currentLeague?.playoffProjections
+  ) {
+    loading.value = true;
+    await getData();
+    loading.value = false;
+  } else if (store.leagueInfo.length > 0) {
+    playoffOdds.value =
+      store.currentLeague.playoffProjections ?? [];
+  }
+});
+
+watch(
+  () => store.currentLeagueId,
+  async () => {
+    if (!store.currentLeague.playoffProjections) {
+      playoffOdds.value = [];
+      loading.value = true;
+      await getData();
+      loading.value = false;
+    }
+    playoffOdds.value =
+      store.currentLeague.playoffProjections ?? [];
+  }
+);
+
+const maxPoints = computed(() => {
+  return maxBy(store.currentLeague.rosters, "pointsFor")
+    ?.pointsFor;
+});
+
+const playoffTeams = computed(() => {
+  return store.currentLeague
+    ? store.currentLeague.playoffTeams
+    : 6;
+});
+
+const playoffArray = computed(() => {
+  return Array.from({ length: playoffTeams.value }, (_, i) => i + 1);
+});
+
+const getRecord = (wins: number) => {
+  const currentLeague = store.currentLeague;
+  if (currentLeague) {
+    const wholeWins = Math.round(wins);
+    const losses = currentLeague.regularSeasonLength - wholeWins;
+    return `${wholeWins} - ${losses}`;
+  }
+};
+
+const numSimulations = 2000;
+
+const getData = async () => {
+  const currentLeague = store.currentLeague;
+  if (currentLeague) {
+    if (currentLeague.lastScoredWeek >= currentLeague.regularSeasonLength) {
+      playoffOdds.value = props.propsTableData.map((user, index) => {
+        return {
+          name: user.name,
+          username: user.username,
+          id: user.id,
+          score: 0,
+          currentWins: user.wins,
+          originalWins: user.wins,
+          placement: Array(numSimulations).fill(index + 1),
+          playoffPercentage: index + 1 <= playoffTeams.value ? numSimulations : 0,
+          projectedWinsTotal: user.wins,
+        };
+      });
+    } else {
+      if (
+        store.leagueInfo.length > 0 &&
+        !hasProjectionData(store.currentLeague)
+      ) {
+        await Promise.all(
+          currentLeague.rosters.map(async (roster) => {
+            const singleRoster: { projection: number; position: string }[] = [];
+            if (!roster.players) return [];
+            const projectionPromises = roster.players.map((player: string) => {
+              return getProjections(
+                player,
+                currentLeague.season,
+                currentLeague["currentWeek"] ? currentLeague["currentWeek"] : 0,
+                currentLeague["scoringType"]
+              );
+            });
+
+            const projections = await Promise.all(projectionPromises);
+            singleRoster.push(...projections);
+            store.addProjectionData(
+              getLeagueKey(currentLeague),
+              roster.id,
+              singleRoster
+            );
+          })
+        );
+      }
+
+      const nameMapping = new Map(
+        store.currentLeague.users.map((user) => [
+          user.id,
+          user.name,
+        ])
+      );
+
+      const userNameMapping = new Map(
+        store.currentLeague.users.map((user) => [
+          user.id,
+          user.username,
+        ])
+      );
+
+      currentLeague.rosters.forEach((roster: RosterType) => {
+        const winScore = roster.wins / currentLeague.lastScoredWeek;
+        const pointScore = roster.pointsFor / (maxPoints.value ?? 0);
+        const projectedScore: number = roster.projections
+          ? getTopProjectionsSum(roster.projections) / maxProjectedScore.value
+          : 0;
+          playoffOdds.value.push({
+          name: nameMapping.get(roster.id) ?? "",
+          username: userNameMapping.get(roster.id) ?? "",
+          id: roster.id,
+          score: calculatePowerScore(winScore, pointScore, projectedScore),
+          currentWins: roster.wins,
+          originalWins: roster.wins,
+          placement: [],
+          playoffPercentage: 0,
+          projectedWinsTotal: 0,
+        });
+      });
+
+      for (let sim = 0; sim < numSimulations; sim++) {
+        for (
+          let i = currentLeague.lastScoredWeek;
+          i <= currentLeague.regularSeasonLength;
+          i++
+        ) {
+          playoffOdds.value.forEach((roster) => {
+            const randomOpponentIndex = Math.floor(
+              Math.random() * currentLeague.totalRosters
+            );
+            const opponentPowerScore =
+              playoffOdds.value[randomOpponentIndex].score;
+            const winProbability =
+              Math.round(
+                (roster.score * 1000) / (roster.score + opponentPowerScore)
+              ) / 1000;
+            const randomOutcome = Math.random();
+            if (winProbability > randomOutcome) {
+              roster.currentWins += 1;
+            }
+          });
+        }
+        const copyArray = playoffOdds.value
+          .slice()
+          .sort((a, b) => (b.currentWins ?? 0) - (a.currentWins ?? 0));
+        playoffOdds.value.forEach((roster) => {
+          const placement = copyArray.findIndex((obj) => obj.id === roster.id);
+          roster.placement.push(placement + 1);
+          roster.projectedWinsTotal += roster.currentWins / 2000;
+          roster.currentWins = roster.originalWins;
+          if (placement + 1 <= playoffTeams.value) {
+            roster.playoffPercentage += 1;
+          }
+        });
+      }
+    }
+    playoffOdds.value.sort((a, b) => sum(a.placement) - sum(b.placement));
+  }
+  if (currentLeague) {
+    store.addPlayoffOdds(getLeagueKey(currentLeague), playoffOdds.value);
+  }
+};
+
+const getTopProjectionsSum = (
+  players: { projection: number; position: string }[]
+) => {
+  const sumTopN = (position: string, count: number) => {
+    return players
+      .filter((player) => player.position === position)
+      .sort((a, b) => b.projection - a.projection)
+      .slice(0, count)
+      .reduce((sum, player) => sum + player.projection, 0);
+  };
+
+  return (
+    sumTopN("RB", 3) + sumTopN("WR", 3) + sumTopN("QB", 1) + sumTopN("TE", 1)
+  );
+};
+
+const maxProjectedScore = computed(() => {
+  const result = store.currentLeague.rosters.map(
+    (roster) => {
+      if (roster.projections) {
+        return getTopProjectionsSum(roster.projections);
+      }
+      return 0;
+    }
+  );
+  return Math.max(...result);
+});
+
+const showPlayoffOdds = computed(() => {
+  if (store.leagueInfo.length > 0) {
+    const currentLeague = store.currentLeague;
+    if (
+      currentLeague &&
+      currentLeague.lastScoredWeek < currentLeague.regularSeasonLength
+    ) {
+      return true;
+    }
+    return false;
+  } else if (store.leagueInfo.length == 0) {
+    return false;
+  }
+  return true;
+});
+
+const calculatePowerScore = (
+  winScore: number,
+  pointScore: number,
+  projectedScore: number
+) => {
+  return (
+    Math.round(
+      (0.6 * winScore + 0.2 * pointScore + 0.2 * projectedScore) * 1000
+    ) / 1000
+  );
+};
+
+const tableData = computed(() => {
+  return store.leagueInfo.length > 0
+    ? store.currentLeague.playoffProjections
+    : demoPlayoffData.value;
+});
+</script>
+<template>
+  <Card
+    v-if="
+      store.leagueInfo.length != 0 &&
+      store.currentLeague &&
+      store.currentLeague.status !== 'complete'
+    "
+  >
+    <button
+      type="button"
+      class="flex min-h-11 w-full items-center justify-between rounded-lg px-3 text-lg font-semibold focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      :class="`${showData ? 'rounded-t-lg' : 'rounded-lg'}`"
+      :aria-expanded="showData"
+      aria-controls="playoff-odds-table"
+      @click="showData = !showData"
+    >
+      <span class="flex-1 text-center">Playoff Odds</span>
+      <svg
+        v-if="!showData"
+        class="w-6 h-6"
+        aria-hidden="true"
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        fill="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M18.425 10.271C19.499 8.967 18.57 7 16.88 7H7.12c-1.69 0-2.618 1.967-1.544 3.271l4.881 5.927a2 2 0 0 0 3.088 0l4.88-5.927Z"
+          clip-rule="evenodd"
+        />
+      </svg>
+      <svg
+        v-else
+        class="w-6 h-6"
+        aria-hidden="true"
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        fill="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M5.575 13.729C4.501 15.033 5.43 17 7.12 17h9.762c1.69 0 2.618-1.967 1.544-3.271l-4.881-5.927a2 2 0 0 0-3.088 0l-4.88 5.927Z"
+          clip-rule="evenodd"
+        />
+      </svg>
+    </button>
+    <div
+      v-if="!loading"
+      id="playoff-odds-table"
+      class="relative w-full overflow-x-auto bg-card"
+    >
+      <table v-if="showData" class="w-full text-sm text-left rtl:text-right">
+        <thead class="text-xs uppercase bg-muted/50">
+          <tr>
+            <th scope="col" class="px-4 py-3 sm:px-6 w-60">Team Name</th>
+            <th v-for="i in playoffTeams" scope="col" class="px-2 py-3">
+              <div class="flex items-center w-8">
+                {{ formatOrdinal(i) }}
+              </div>
+            </th>
+            <th
+              scope="col"
+              class="py-3 pl-5 sm:pl-8 md:pl-14 lg:pl-24 xl:pl-32"
+            >
+              Total
+            </th>
+            <th class="py-3 pl-5 min-w-24 lg:pl-0" scope="col">
+              <span class="hidden lg:inline">Proj</span> Record
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="(item, index) in tableData"
+            :key="index"
+            class="border-b"
+            :class="{
+              'border-primary border-b-2 ': index == playoffTeams - 1,
+            }"
+          >
+            <th
+              scope="row"
+              class="px-4 font-medium truncate sm:px-6 max-w-52 whitespace-nowrap"
+            >
+              {{ store.showUsernames ? item.username : item.name }}
+            </th>
+            <td v-for="i in playoffTeams" class="px-2 py-3">
+              {{
+                store.leagueInfo.length > 0
+                  ? Math.round(
+                      (item.placement.filter(
+                        (position: number) => position === i
+                      ).length *
+                        100 *
+                        10) /
+                        numSimulations
+                    ) / 10
+                  : item.placement[i - 1]
+              }}%
+            </td>
+            <td class="py-3 pl-5 border-l sm:pl-8 md:pl-14 lg:pl-24 xl:pl-32">
+              {{
+                store.leagueInfo.length > 0
+                  ? Math.round(
+                      (item.placement.filter((position: number) =>
+                        playoffArray.includes(position)
+                      ).length *
+                        100 *
+                        10) /
+                        numSimulations
+                    ) / 10
+                  : sum(item.placement)
+              }}%
+            </td>
+            <td class="pl-7">{{ getRecord(item.projectedWinsTotal) }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p
+        v-if="showData"
+        class="max-w-3xl py-3 ml-2 text-xs text-muted-foreground sm:ml-6"
+      >
+        Playoff odds are estimated using Monte Carlo simulation based on team
+        records, total points, and projected rest-of-season points. League
+        settings are not taken into account so mathematically eliminated teams
+        may still have a percentage greater than zero.
+      </p>
+    </div>
+    <div
+      v-else
+      role="status"
+      class="p-4 border border-border rounded-lg bg-card shadow-xs animate-pulse md:p-6"
+    >
+      <p class="flex justify-center -mb-6 text-xl font-semibold">
+        Loading projection data...
+      </p>
+      <div
+        class="h-2.5 bg-muted rounded-full w-32 mb-2.5"
+      ></div>
+      <div
+        class="w-48 h-2 mb-10 bg-muted rounded-full"
+      ></div>
+      <div class="flex items-baseline mt-36">
+        <div
+          class="w-full h-40 bg-muted rounded-t-lg"
+        ></div>
+        <div
+          class="w-full bg-muted rounded-t-lg h-96 ms-6"
+        ></div>
+        <div
+          class="w-full bg-muted rounded-t-lg h-60 ms-6"
+        ></div>
+        <div
+          class="w-full h-40 bg-muted rounded-t-lg ms-6"
+        ></div>
+        <div
+          class="w-full h-32 bg-muted rounded-t-lg ms-6"
+        ></div>
+        <div
+          class="w-full bg-muted rounded-t-lg h-36 ms-6"
+        ></div>
+        <div
+          class="w-full bg-muted rounded-t-lg h-72 ms-6"
+        ></div>
+        <div
+          class="w-full bg-muted rounded-t-lg h-44 ms-6"
+        ></div>
+        <div
+          class="w-full bg-muted rounded-t-lg h-44 ms-6"
+        ></div>
+        <div
+          class="w-full h-64 bg-muted rounded-t-lg ms-6"
+        ></div>
+        <div
+          class="w-full h-64 bg-muted rounded-t-lg ms-6"
+        ></div>
+        <div
+          class="w-full bg-muted rounded-t-lg h-44 ms-6"
+        ></div>
+      </div>
+      <span class="sr-only">Loading...</span>
+    </div>
+  </Card>
+</template>

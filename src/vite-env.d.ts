@@ -1,0 +1,28 @@
+/// <reference types="vite/client" />
+
+interface ImportMetaEnv {
+  readonly VITE_SUPABASE_URL?: string;
+  readonly VITE_SUPABASE_ANON_KEY?: string;
+  readonly VITE_BACKEND_URL?: string;
+  readonly VITE_PLAYER_ID_LOOKUP?: string;
+  readonly VITE_POSTHOG_KEY?: string;
+  readonly VITE_PREMIUM_WEEKLY_REPORT: string;
+  readonly VITE_MANAGER_COMPARISON: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
+declare module "markdown-it" {
+  export default class MarkdownIt {
+    constructor(...args: unknown[]);
+    render(src: string, env?: unknown): string;
+  }
+}
+
+declare module "virtual:pwa-register" {
+  export const registerSW: (options?: { immediate?: boolean }) => () => void;
+}
+
+declare module "apexcharts/features/legend";

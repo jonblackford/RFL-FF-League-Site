@@ -1,0 +1,603 @@
+<script setup lang="ts">
+import {
+  ref,
+  onMounted,
+  shallowRef,
+  watch,
+  computed,
+  ComputedRef,
+} from "vue";
+import { WaiverMove } from "../../types/types.ts";
+import { getPlayersByIdsMap } from "../../api/api.ts";
+import { getTradeValue } from "../../api/sleeperApi.ts";
+import { getLeagueKey, useStore } from "../../store/store";
+import { WeeklyWaiver } from "../../types/apiTypes";
+import Card from "../ui/card/Card.vue";
+import {
+  Select,
+  SelectContent,
+  SelectTrigger,
+  SelectItem,
+  SelectValue,
+} from "../ui/select";
+import Separator from "../ui/separator/Separator.vue";
+import Label from "../ui/label/Label.vue";
+import {
+  getTransactionRatingClass as getValueColor,
+  getTransactionRatingLabel as getRatingLabel,
+} from "@/lib/transactionRating";
+import {
+  loadDemoLeague,
+  loadDemoRosterManagement,
+  type DemoLeagueFixtures,
+} from "@/data/demo/loaders";
+
+type WaiverData = Record<string | number, WaiverMove[]>;
+
+const store = useStore();
+const rawData = ref<WaiverMove[]>([]);
+const demoLeague = shallowRef<DemoLeagueFixtures | null>(null);
+
+const loadDemoData = async () => {
+  const [league, rosterManagement] = await Promise.all([
+    loadDemoLeague(),
+    loadDemoRosterManagement(),
+  ]);
+  demoLeague.value = league;
+  rawData.value = rosterManagement.fakeWaiverMoves;
+};
+type LeagueWaiverMove = Pick<
+  WeeklyWaiver,
+  "roster_ids" | "adds" | "leg" | "settings" | "status"
+>;
+type TempWaiverMove = {
+  roster_id: number;
+  adds: string;
+  week: number;
+  bid: number | null;
+  status: string;
+};
+
+const getData = async () => {
+  const currentLeague = store.currentLeague;
+  const temp: TempWaiverMove[] = (currentLeague.waivers as LeagueWaiverMove[])
+    .filter((waiver) => waiver.adds)
+    .map((waiver) => ({
+      roster_id: waiver.roster_ids?.[0] ?? 0,
+      adds: waiver.adds ? Object.keys(waiver.adds)[0] : "",
+      week: waiver.leg,
+      bid: waiver.settings?.waiver_bid ?? null,
+      status: waiver.status,
+    }))
+    .filter((waiver) => waiver.roster_id !== 0 && waiver.adds);
+
+  // Step 1: Collect all unique player IDs from all trades
+  const allUniquePlayerIds = new Set<string>();
+  temp.forEach((trade) => {
+    if (trade.adds) allUniquePlayerIds.add(trade.adds);
+  });
+
+  const uniquePlayerIdArray = Array.from(allUniquePlayerIds);
+
+  // Step 2: Make ONE API call to fetch all unique players required across all trades
+  let playerLookupMap = new Map<
+    string,
+    { name?: string; team?: string; position?: string; player_id?: string }
+  >();
+  if (uniquePlayerIdArray.length > 0) {
+    playerLookupMap = await getPlayersByIdsMap(uniquePlayerIdArray);
+  }
+
+  // Step 3: Map `temp` data, using the pre-fetched `playerLookupMap`
+  rawData.value = await Promise.all(
+    temp.map(async (trade) => {
+      const addsPlayer = playerLookupMap.get(trade.adds);
+      return {
+        id: trade.roster_id,
+        user: getRosterName(trade.roster_id),
+        adds: addsPlayer?.name
+          ? addsPlayer.name
+          : `${addsPlayer?.team ?? ""} Defense`,
+        week: trade.week,
+        value: await getTradeValue(
+          trade.adds,
+          currentLeague.season,
+          trade.week + 1,
+          currentLeague.scoringType,
+          addsPlayer?.position
+        ),
+        position: addsPlayer?.position ?? "",
+        player_id: addsPlayer?.player_id ?? trade.adds,
+        bid: trade.bid ?? null,
+        status: trade.status,
+      };
+    })
+  );
+
+  store.addWaiverMoves(getLeagueKey(currentLeague), rawData.value);
+};
+
+const currentManagerMoves = computed(() => {
+  return Object.values(waiverData.value)
+    .flat()
+    .filter(
+      (move) =>
+        move.user?.username === currentManager.value ||
+        move.user?.name === currentManager.value
+    );
+});
+
+const totalSpent = computed(() => {
+  return currentManagerMoves.value
+    .filter((m) => m.status === "complete")
+    .reduce((sum, m) => sum + (m.bid || 0), 0);
+});
+
+const waiverData: ComputedRef<WaiverData> = computed(() => {
+  const sortedData = rawData.value.reduce<WaiverData>((acc, move) => {
+    const id = move.id;
+    if (!acc[id]) {
+      acc[id] = [];
+    }
+
+    acc[id].push(move);
+
+    return acc;
+  }, {});
+
+  Object.keys(sortedData).forEach((id) => {
+    sortedData[id].sort((a, b) => {
+      return a.week - b.week;
+    });
+  });
+  return sortedData;
+});
+
+const orderedData = computed(() => {
+  if (
+    rawData.value.filter(
+      (player) =>
+        !["K", "DEF"].includes(player.position) &&
+        player.value != null &&
+        player.status === "complete"
+    ).length > 5
+  ) {
+    return rawData.value
+      .filter(
+        (player) =>
+          !["K", "DEF"].includes(player.position) &&
+          player.value != null &&
+          player.status === "complete"
+      )
+      .sort(
+        (a, b) =>
+          (a.value ?? Number.POSITIVE_INFINITY) -
+          (b.value ?? Number.POSITIVE_INFINITY)
+      )
+      .slice(0, 10);
+  }
+  return rawData.value
+    .filter((player) => player.value != null)
+    .sort(
+      (a, b) =>
+        (a.value ?? Number.POSITIVE_INFINITY) -
+        (b.value ?? Number.POSITIVE_INFINITY)
+    )
+    .slice(0, 10);
+});
+
+const managers = computed(() => {
+  const currentLeague = store.currentLeague;
+  if (currentLeague) {
+    const currentRosterIds = currentLeague.rosters.map((roster) => roster.id);
+    const result = currentLeague.users
+      .filter((user) => currentRosterIds.includes(user.id))
+      .map((user) => (store.showUsernames ? user.username : user.name));
+    result.unshift("All Managers");
+    return result;
+  } else if (store.leagueInfo.length == 0) {
+    return (demoLeague.value?.fakeUsers ?? []).map((user) => user.name);
+  }
+  return [];
+});
+
+const currentManager = ref(managers.value[1]);
+
+const getRosterName = (rosterId: number) => {
+  const rosters = store.currentLeague
+    ? store.currentLeague.rosters
+    : (demoLeague.value?.fakeRosters ?? []);
+  const users = store.currentLeague
+    ? store.currentLeague.users
+    : (demoLeague.value?.fakeUsers ?? []);
+  const userId = rosters.find((roster) => roster.rosterId === rosterId);
+  if (userId) {
+    const userObject = users.find((user) => user.id === userId.id);
+    if (userObject) {
+      return userObject;
+    }
+  }
+  return {
+    id: String(rosterId),
+    avatar: "",
+    avatarImg: "",
+    name: "Ghost Roster",
+    username: "Ghost Roster",
+  };
+};
+
+const getAllManagersSpend = (groupedMoves: WaiverMove[]) => {
+  return groupedMoves
+    .filter((m) => m.status === "complete")
+    .reduce((sum, m) => sum + (m.bid || 0), 0);
+};
+
+onMounted(async () => {
+  if (
+    store.leagueInfo.length > 0 &&
+    store.currentLeague &&
+    !store.currentLeague.waiverMoves
+  ) {
+    await getData();
+  } else if (store.leagueInfo.length == 0) {
+    await loadDemoData();
+    currentManager.value = managers.value[1];
+  } else if (store.currentLeague) {
+    rawData.value =
+      store.currentLeague.waiverMoves ?? [];
+  }
+});
+
+watch(
+  () => store.currentLeagueId,
+  async () => {
+    if (!store.currentLeague) {
+      await loadDemoData();
+      currentManager.value = managers.value[0];
+      return;
+    }
+    if (!store.currentLeague.waiverMoves) {
+      rawData.value = [];
+      await getData();
+    }
+    rawData.value =
+      store.currentLeague.waiverMoves ?? [];
+    currentManager.value = managers.value[0];
+  }
+);
+watch(
+  () => store.showUsernames,
+  () => {
+    currentManager.value = managers.value[0];
+  }
+);
+</script>
+<template>
+  <div
+    class="flex flex-wrap mb-0 xl:flex-nowrap"
+    :class="{ 'mt-4 xl:mb-4': store.currentTab === 'Roster Management' }"
+  >
+    <Card
+      v-if="store.currentTab === 'Roster Management'"
+      class="w-full py-4 pl-4 overflow-auto xl:w-2/3 md:py-6 md:pl-6"
+    >
+      <h1 class="pb-2 text-2xl font-semibold tracking-tight">
+        Waivers & Free Agent Adds
+      </h1>
+      <p
+        class="mt-1 mb-3 text-sm text-muted-foreground max-w-80 sm:max-w-2xl sm:text-base"
+      >
+        Values below each player are the average positional ranking for every
+        week after the player was added. If applicable, the winning bid (FAAB)
+        is also listed next to each player.
+      </p>
+      <Label class="block mb-1 text-sm">Manager</Label>
+      <Select v-model="currentManager">
+        <SelectTrigger class="min-w-0 w-[calc(100%-1.5rem)] sm:w-52">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent
+          class="w-(--reka-select-trigger-width) max-w-[calc(100vw-2rem)]"
+        >
+          <SelectItem
+            v-for="manager in managers"
+            :key="manager"
+            :value="manager"
+            class="min-w-0"
+          >
+            <span class="block truncate">{{ manager }}</span>
+          </SelectItem>
+        </SelectContent>
+      </Select>
+
+      <div v-if="currentManagerMoves.length > 0" class="flex">
+        <div class="block w-full my-2 overflow-auto custom-width">
+          <Separator class="my-2" />
+          <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+            <template
+              v-for="move in currentManagerMoves"
+              :key="move.adds + move.week + move.user.username"
+            >
+              <div v-if="move.adds && move.status === 'complete'">
+                <p class="text-sm font-medium">
+                  {{ move.adds }} <span v-if="move.bid">(${{ move.bid }})</span>
+                </p>
+                <div class="flex mt-1">
+                  <span
+                    :class="[move.value ? getValueColor(move.value) : '']"
+                    class="text-xs me-2 px-2.5 py-1 rounded-full"
+                    >{{ move.value ? move.value : "N/A" }}</span
+                  >
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    {{ move.value ? getRatingLabel(move.value) : "" }}
+                  </p>
+                </div>
+              </div>
+            </template>
+          </div>
+          <Card
+            v-if="store.currentLeague?.waiverType === 2"
+            class="flex p-3 mt-4 mr-4 text-sm"
+          >
+            <div class="mr-4">
+              <p class="min-w-32">Budget spent:</p>
+              <p class="mt-1 text-2xl font-semibold">${{ totalSpent }}</p>
+            </div>
+            <div class="">
+              <p class="min-w-20">Failed bids:</p>
+              <div class="flex flex-wrap gap-x-2 gap-y-0">
+                <template v-for="move in currentManagerMoves">
+                  <div
+                    v-if="move.status === 'failed' && move.bid"
+                    class="sm:py-1.5 pr-1.5 mt-1.5"
+                  >
+                    <p class="font-medium">{{ move.adds }} (${{ move.bid }})</p>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+      <div v-else-if="currentManager === 'All Managers'">
+        <div v-for="(moves, id) in waiverData">
+          <Separator class="mt-3 mb-2" />
+          <p class="my-2 text-lg font-semibold">
+            {{
+              store.showUsernames
+                ? getRosterName(Number(id)).username
+                : getRosterName(Number(id)).name
+            }}
+          </p>
+          <div
+            class="grid grid-cols-2 gap-2 mb-8 sm:grid-cols-3 md:grid-cols-4"
+          >
+            <template v-for="move in moves" class="">
+              <div v-if="move.adds && move.status === 'complete'">
+                <p class="text-sm font-medium">
+                  {{ move.adds }} <span v-if="move.bid">(${{ move.bid }})</span>
+                </p>
+                <div class="flex mt-1">
+                  <span
+                    :class="[move.value ? getValueColor(move.value) : '']"
+                    class="text-xs me-2 px-2.5 py-1 rounded-full"
+                    >{{ move.value ? move.value : "N/A" }}</span
+                  >
+                  <p class="mt-1 text-xs">
+                    {{ move.value ? getRatingLabel(move.value) : "" }}
+                  </p>
+                </div>
+              </div>
+            </template>
+          </div>
+          <Card
+            v-if="store.currentLeague?.waiverType === 2"
+            class="flex p-3 mt-4 mr-4 text-sm"
+          >
+            <div class="mr-4">
+              <p class="min-w-32">Budget spent:</p>
+              <p class="mt-1 text-2xl font-semibold">
+                ${{ getAllManagersSpend(moves) }}
+              </p>
+            </div>
+            <div>
+              <p class="min-w-20">Failed bids:</p>
+              <div class="flex flex-wrap gap-x-2 gap-y-0">
+                <template v-for="move in moves">
+                  <div
+                    v-if="move.status === 'failed' && move.bid"
+                    class="py-1.5 pr-1.5 mt-1.5"
+                  >
+                    <p class="font-medium">{{ move.adds }} (${{ move.bid }})</p>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+      <div
+        v-else-if="
+          store.leagueInfo.length > 0 &&
+          store.currentLeague &&
+          currentManagerMoves.length == 0
+        "
+      >
+        <p class="mt-4 text-muted-foreground">
+          No waiver moves have been made.
+        </p>
+      </div>
+      <div v-else-if="store.leagueInfo.length !== 0" class="flex flex-wrap">
+        <div role="status" class="max-w-md mt-4 animate-pulse">
+          <div class="flex items-center mb-4">
+            <svg
+              class="w-10 h-10 text-muted me-3"
+              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                d="M10 0a10 10 0 1 0 10 10A10.011 10.011 0 0 0 10 0Zm0 5a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 13a8.949 8.949 0 0 1-4.951-1.488A3.987 3.987 0 0 1 9 13h2a3.987 3.987 0 0 1 3.951 3.512A8.949 8.949 0 0 1 10 18Z"
+              />
+            </svg>
+            <div>
+              <p class="mb-1 text-foreground">Loading waiver moves...</p>
+              <div class="h-2.5 bg-muted rounded-full w-48 mb-2"></div>
+            </div>
+          </div>
+          <div class="h-2.5 bg-muted rounded-full w-72 mb-4"></div>
+          <div class="h-2 bg-muted rounded-full mb-2.5"></div>
+          <div class="h-2 bg-muted rounded-full mb-2.5"></div>
+          <div class="h-2 bg-muted rounded-full mb-2.5"></div>
+          <div class="h-2 rounded-full bg-muted"></div>
+
+          <span class="sr-only">Loading...</span>
+        </div>
+      </div>
+    </Card>
+    <Card
+      class="w-full py-4 pl-4 mb-4 overflow-auto xl:mb-0 md:py-6 md:pl-6"
+      :class="{
+        'xl:w-1/3 xl:ml-4 xl:mt-0 mt-4':
+          store.currentTab === 'Roster Management',
+      }"
+    >
+      <p class="mb-4 text-2xl font-semibold tracking-tight">Best Adds</p>
+      <div
+        v-if="orderedData.length > 0"
+        v-for="(move, index) in orderedData"
+        class="pr-6 mb-4"
+      >
+        <div class="flex justify-between">
+          <div class="flex mb-1">
+            <p class="mt-2 mr-2 text-base font-semibold">{{ index + 1 }}.</p>
+            <div class="mt-1 mr-2">
+              <img
+                alt="User avatar"
+                v-if="move.position !== 'DEF'"
+                class="object-cover rounded-full w-14"
+                :src="`https://sleepercdn.com/content/nfl/players/thumb/${move.player_id}.jpg`"
+              />
+              <img
+                alt="User avatar"
+                v-else-if="move.position === 'DEF'"
+                class="h-10 rounded-full w-14"
+                :src="`https://sleepercdn.com/images/team_logos/nfl/${move.player_id.toLowerCase()}.png`"
+              />
+              <svg
+                v-else
+                class="w-8 h-8"
+                aria-hidden="true"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  d="M10 0a10 10 0 1 0 10 10A10.011 10.011 0 0 0 10 0Zm0 5a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 13a8.949 8.949 0 0 1-4.951-1.488A3.987 3.987 0 0 1 9 13h2a3.987 3.987 0 0 1 3.951 3.512A8.949 8.949 0 0 1 10 18Z"
+                />
+              </svg>
+            </div>
+            <div class="">
+              <p class="text-base font-medium">
+                {{ move.position }} {{ move.adds }}
+              </p>
+              <div
+                class="flex flex-col text-sm text-muted-foreground sm:flex-row"
+              >
+                <p class="truncate max-w-32">
+                  {{
+                    store.showUsernames ? move.user?.username : move.user?.name
+                  }}
+                </p>
+                <p class="sm:ml-1">
+                  <span class="hidden sm:inline">&#183;</span> Week
+                  {{ move.week }}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="">
+            <p
+              :class="[move.value ? getValueColor(move.value) : '']"
+              class="text-xs px-2.5 py-1 mb-1 rounded-full float-end"
+            >
+              {{ move.value ? move.value : "N/A" }}
+            </p>
+            <p class="mt-1 mr-1 text-xs text-right text-muted-foreground">
+              {{ move.value ? getRatingLabel(move.value) : "" }}
+            </p>
+          </div>
+        </div>
+        <Separator class="mt-3" />
+      </div>
+      <div
+        v-else-if="
+          store.leagueInfo.length > 0 &&
+          store.currentLeague &&
+          store.currentLeague.waivers.length === 0
+        "
+      >
+        <p class="text-muted-foreground">No waiver moves have been made.</p>
+      </div>
+      <div
+        v-else-if="
+          store.leagueInfo.length > 0 &&
+          store.currentLeague &&
+          !store.currentLeague.lastScoredWeek
+        "
+      >
+        <p>Please come back after week 1!</p>
+      </div>
+      <div
+        v-else
+        role="status"
+        class="ml-2 space-y-4 divide-y border-border divide-border max-w-80 animate-pulse"
+      >
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="h-2.5 bg-muted/80 rounded-full w-24 mb-2.5"></div>
+            <div class="w-32 h-2 rounded-full bg-muted"></div>
+          </div>
+          <div class="h-2.5 bg-muted/80 rounded-full w-12"></div>
+        </div>
+        <div class="flex items-center justify-between pt-4">
+          <div>
+            <div class="h-2.5 bg-muted/80 rounded-full w-24 mb-2.5"></div>
+            <div class="w-32 h-2 rounded-full bg-muted"></div>
+          </div>
+          <div class="h-2.5 bg-muted/80 rounded-full w-12"></div>
+        </div>
+        <div class="flex items-center justify-between pt-4">
+          <div>
+            <div class="h-2.5 bg-muted/80 rounded-full w-24 mb-2.5"></div>
+            <div class="w-32 h-2 rounded-full bg-muted"></div>
+          </div>
+          <div class="h-2.5 bg-muted/80 rounded-full w-12"></div>
+        </div>
+        <div class="flex items-center justify-between pt-4">
+          <div>
+            <div class="h-2.5 bg-muted/80 rounded-full w-24 mb-2.5"></div>
+            <div class="w-32 h-2 rounded-full bg-muted"></div>
+          </div>
+          <div class="h-2.5 bg-muted/80 rounded-full w-12"></div>
+        </div>
+        <div class="flex items-center justify-between pt-4">
+          <div>
+            <div class="h-2.5 bg-muted/80 rounded-full w-24 mb-2.5"></div>
+            <div class="w-32 h-2 rounded-full bg-muted"></div>
+          </div>
+          <div class="h-2.5 bg-muted/80 rounded-full w-12"></div>
+        </div>
+        <span class="sr-only">Loading...</span>
+      </div>
+    </Card>
+  </div>
+</template>
+<style scoped>
+.custom-width {
+  @media (max-width: 475px) {
+    width: 327px;
+  }
+}
+</style>

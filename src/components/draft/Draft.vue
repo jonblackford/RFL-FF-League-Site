@@ -1,0 +1,674 @@
+<script setup lang="ts">
+import { ref, onMounted, computed, shallowRef, watch } from "vue";
+import { getDraftPicks, getDraftMetadata } from "../../api/sleeperApi";
+import { LeagueInfoType } from "../../types/types.ts";
+import { getLeagueKey, useStore } from "../../store/store";
+import DraftGrades from "./DraftGrades.vue";
+import { DraftPick } from "../../types/apiTypes.ts";
+import SectionCard from "../layout/SectionCard.vue";
+import ManagerAvatar from "../shared/ManagerAvatar.vue";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectTrigger,
+  SelectItem,
+  SelectValue,
+} from "../ui/select";
+import Separator from "../ui/separator/Separator.vue";
+import Label from "../ui/label/Label.vue";
+import { Skeleton } from "@/components/ui/skeleton";
+import { handleImageFallback as handleImageError } from "@/lib/imageFallback";
+import { scrollAppToTop } from "@/lib/appScroll";
+import {
+  loadDemoDraft,
+  loadDemoLeague,
+  type DemoLeagueFixtures,
+} from "@/data/demo/loaders";
+
+const store = useStore();
+const data = ref<DraftPick[]>([]);
+const loading = ref(false);
+type DraftOrderUser = {
+  id: string;
+  name: string;
+  username: string;
+  avatar: string;
+  avatarImg: string;
+  placement: number;
+};
+const draftOrder = ref<DraftOrderUser[]>([]);
+const draftType = ref<string>("snake");
+const roundReversal = ref<number>(0);
+const sortOrder = ref("Draft Order");
+const scoringType = ref(""); // idp
+const demoUsers = shallowRef<DemoLeagueFixtures["fakeUsers"]>([]);
+
+const activeTab = ref("Recap");
+const showManagerProfilesLink = computed(() =>
+  store.isLeagueFeatureVisible("Manager Profiles")
+);
+const isReturningSleeperDynasty = computed(() => {
+  const league = store.currentLeague;
+  return Boolean(
+    league &&
+      league.platform !== "espn" &&
+      league.seasonType === "Dynasty" &&
+      league.previousLeagueId
+  );
+});
+const showManagerOnPickCard = computed(
+  () => draftType.value === "auction" || isReturningSleeperDynasty.value
+);
+
+const openManagerProfiles = () => {
+  if (!showManagerProfilesLink.value) return;
+  store.currentTab = "Manager Profiles";
+  localStorage.setItem("currentTab", "Manager Profiles");
+  scrollAppToTop("smooth");
+};
+
+const loadDemoData = async () => {
+  const [league, draft] = await Promise.all([
+    loadDemoLeague(),
+    loadDemoDraft(),
+  ]);
+  demoUsers.value = league.fakeUsers;
+  data.value = draft.fakeDraftData;
+  draftOrder.value = data.value.slice(0, draftSize.value).map((pick) => {
+    return getTeamName(pick.userId);
+  }) as DraftOrderUser[];
+};
+
+const sortedData = computed(() => {
+  if (sortOrder.value === "Draft Order") {
+    return data.value;
+  }
+  if (sortOrder.value === "Highest Winning Bid") {
+    return [...data.value].sort(
+      (a, b) => Number(b.amount ?? 0) - Number(a.amount ?? 0)
+    );
+  }
+  if (sortOrder.value === "Lowest Winning Bid") {
+    return [...data.value].sort(
+      (a, b) => Number(a.amount ?? 0) - Number(b.amount ?? 0)
+    );
+  }
+  if (sortOrder.value === "Highest Score") {
+    return [...data.value].sort(
+      (a, b) => Number(b.pickRank) - Number(a.pickRank)
+    );
+  }
+  return [...data.value].sort(
+    (a, b) => Number(a.pickRank) - Number(b.pickRank)
+  );
+});
+
+const getDraftOrder = async () => {
+  const currentLeague = store.currentLeague;
+  const metadata = (await getDraftMetadata(currentLeague.draftId)) as {
+    slot_to_roster_id?: Record<string, number | null>;
+    settings?: { reversal_round?: number; budget?: number };
+    type?: string;
+    metadata?: { scoring_type?: string };
+  };
+  // sleeper api draft_order sometimes doesn't include all teams?
+  // using slot_to_roster_id instead
+  const draftOrderData = Object.values(metadata.slot_to_roster_id ?? {}).filter(
+    (item) => item != null
+  );
+  draftOrder.value = draftOrderData
+    .map((rosterId) => {
+      const rosterObj = currentLeague.rosters.find(
+        (roster) => roster.rosterId === rosterId
+      );
+      return rosterObj ? getTeamName(rosterObj.id) : undefined;
+    })
+    .filter((user): user is DraftOrderUser => Boolean(user));
+
+  roundReversal.value = metadata.settings?.reversal_round ?? 0;
+  draftType.value = metadata.type ?? "snake";
+  scoringType.value = metadata.metadata?.scoring_type ?? "";
+
+  store.addDraftMetadata(getLeagueKey(currentLeague), {
+    order: draftOrder.value,
+    roundReversal: roundReversal.value,
+    draftType: draftType.value,
+    auctionBudget: metadata.settings?.budget,
+  });
+};
+
+const draftSize = computed(() => {
+  if (store.leagueInfo && store.currentLeague) {
+    return store.currentLeague.rosters.length;
+  }
+  return 10;
+});
+
+const teamRanks = computed(() => {
+  return data.value.reduce<Record<string, number>>((acc, pick) => {
+    acc[pick.userId] = (acc[pick.userId] || 0) + parseFloat(pick.pickRank);
+    return acc;
+  }, {});
+});
+
+const snakeDraftFormat = computed(() => {
+  if (
+    store.currentLeague &&
+    ((store.currentLeague.seasonType === "Dynasty" &&
+      draftType.value === "linear") ||
+      draftType.value === "auction")
+  ) {
+    return false;
+  }
+  return true;
+});
+
+watch(draftType, () => {
+  sortOrder.value = "Draft Order";
+});
+
+const getEspnDraftOrderFromPicks = (league: LeagueInfoType) => {
+  const rosterPickOrder = Array.from(
+    new Set((league.draftPicks ?? []).map((pick) => pick.rosterId))
+  ).slice(0, draftSize.value);
+
+  const rosterToUser = new Map(
+    league.rosters.map((roster) => [roster.rosterId, roster.id])
+  );
+  const userMap = new Map(league.users.map((user) => [user.id, user]));
+
+  return rosterPickOrder.flatMap((rosterId) => {
+    const userId = rosterToUser.get(rosterId);
+    return userId && userMap.has(userId) ? [getTeamName(userId)] : [];
+  });
+};
+
+const setLeagueDraftState = (league: LeagueInfoType) => {
+  data.value = league.draftPicks ?? [];
+  draftOrder.value =
+    league.draftMetadata?.order ??
+    (league.platform === "espn" ? getEspnDraftOrderFromPicks(league) : []);
+  roundReversal.value = league.draftMetadata?.roundReversal ?? 0;
+  draftType.value =
+    league.draftMetadata?.draftType ??
+    (data.value.some((pick) => Number(pick.amount ?? 0) > 0)
+      ? "auction"
+      : "snake");
+};
+
+onMounted(async () => {
+  if (
+    store.leagueInfo.length > 0 &&
+    store.currentLeague &&
+    !store.currentLeague.draftPicks &&
+    store.currentLeague.platform !== "espn"
+  ) {
+    loading.value = true;
+    await getDraftOrder();
+    await getData();
+    loading.value = false;
+  } else if (store.currentLeague) {
+    setLeagueDraftState(store.currentLeague);
+  } else if (store.leagueInfo.length == 0) {
+    await loadDemoData();
+  }
+});
+
+watch(
+  () => store.currentLeagueId,
+  async () => {
+    if (!store.currentLeague) {
+      await loadDemoData();
+      return;
+    }
+    if (
+      store.currentLeague &&
+      !store.currentLeague.draftPicks &&
+      store.currentLeague.platform !== "espn"
+    ) {
+      data.value = [];
+      draftOrder.value = [];
+      loading.value = true;
+      await getDraftOrder();
+      await getData();
+      loading.value = false;
+    }
+    if (store.currentLeague) {
+      setLeagueDraftState(store.currentLeague);
+    }
+  }
+);
+
+const getData = async () => {
+  const currentLeague = store.currentLeague;
+  const draftPicks = await getDraftPicks(
+    currentLeague.draftId,
+    currentLeague.season,
+    currentLeague.scoringType,
+    currentLeague.seasonType,
+    currentLeague.draftMetadata?.draftType
+  );
+  if (draftType.value === "snake") {
+    const roundGroups = draftPicks.reduce<Record<number, DraftPick[]>>(
+      (acc, pick) => {
+        if (!acc[pick.round]) {
+          acc[pick.round] = [];
+        }
+        acc[pick.round].push(pick);
+        return acc;
+      },
+      {}
+    );
+
+    data.value = Object.entries(roundGroups)
+      .map(([round, picks]) => {
+        const roundNum = parseInt(round);
+        if (roundReversal.value === 3) {
+          // For round 1: never reverse
+          // For rounds 2-3: reverse on even rounds
+          // For rounds 4+: reverse on odd rounds
+          if (roundNum === 1) {
+            return picks;
+          } else if (roundNum <= 2) {
+            return roundNum % 2 === 0 ? [...picks].reverse() : picks;
+          } else {
+            return roundNum % 2 === 1 ? [...picks].reverse() : picks;
+          }
+        } else {
+          // Regular snake: reverse every even round
+          return roundNum % 2 === 0 ? [...picks].reverse() : picks;
+        }
+      })
+      .flat();
+  } else {
+    data.value = draftPicks;
+  }
+
+  store.addDraftPicks(getLeagueKey(currentLeague), data.value);
+};
+
+const getTeamName = (userId: string) => {
+  if (store.currentLeague) {
+    const userObject = store.currentLeague.users.find(
+      (user) => user.id === userId
+    );
+    if (userObject) {
+      return {
+        ...userObject,
+        placement: userObject.placement ?? 0,
+      } as DraftOrderUser;
+    }
+  } else {
+    const userObject = demoUsers.value.find((user) => user.id === userId);
+    if (userObject) {
+      return {
+        ...userObject,
+        placement: 0,
+      } as DraftOrderUser;
+    }
+  }
+  return {
+    id: userId,
+    name: "Unknown Team",
+    username: "Unknown Team",
+    avatar: "",
+    avatarImg: "",
+    placement: 0,
+  };
+};
+
+const getManagerDisplayName = (userId: string) => {
+  const manager = getTeamName(userId);
+  return store.showUsernames ? manager.username : manager.name;
+};
+
+const getBgColor = (position: string) => {
+  if (position === "RB") {
+    return "bg-sky-300 dark:bg-sky-800";
+  } else if (position === "WR") {
+    return "bg-green-300 dark:bg-green-800";
+  } else if (position === "QB") {
+    return "bg-fuchsia-300 dark:bg-fuchsia-800";
+  } else if (position === "TE") {
+    return "bg-red-300 dark:bg-red-800";
+  } else if (position === "K") {
+    return "bg-amber-300 dark:bg-amber-800";
+  } else if (position === "DEF") {
+    return "bg-rose-300 dark:bg-rose-800";
+  } else {
+    return "bg-neutral-300 dark:bg-neutral-700";
+  }
+};
+
+const getRoundPick = (draftSlot: number, round: number) => {
+  if (draftType.value === "linear") {
+    return draftSlot;
+  }
+  if (roundReversal.value === 3) {
+    if (round <= 2) {
+      return round % 2 === 0
+        ? Math.abs(draftSlot - draftSize.value) + 1
+        : draftSlot;
+    } else {
+      return round % 2 === 1
+        ? Math.abs(draftSlot - draftSize.value) + 1
+        : draftSlot;
+    }
+  } else {
+    if (round % 2 == 0) {
+      return Math.abs(draftSlot - draftSize.value) + 1;
+    } else return draftSlot;
+  }
+};
+
+const getValueColor = (value: number) => {
+  if (value >= 2.5)
+    return "bg-emerald-100 text-emerald-900 dark:bg-emerald-700 dark:text-gray-50";
+  if (value >= 1.75)
+    return "bg-green-100 text-green-900 dark:bg-green-700 dark:text-gray-50";
+  if (value >= 0.75)
+    return "bg-emerald-100 text-emerald-900 dark:bg-emerald-700 dark:text-gray-50";
+  if (value >= 0) return "bg-muted text-muted-foreground";
+  if (value >= -1.75)
+    return "bg-rose-100 text-rose-900 dark:bg-rose-700 dark:text-gray-50";
+  if (value >= -2.5)
+    return "bg-red-100 text-red-900 dark:bg-red-700 dark:text-gray-50";
+  return "bg-red-100 text-red-900 dark:bg-red-700 dark:text-gray-50";
+};
+</script>
+<template>
+  <SectionCard class="w-full">
+    <Tabs default-value="Recap" v-model="activeTab">
+      <div class="flex flex-col gap-2 mb-2 sm:flex-row sm:justify-between">
+        <h2 class="heading-section">Draft {{ activeTab }}</h2>
+        <div class="inline-flex p-1" role="tablist">
+          <TabsList>
+            <TabsTrigger value="Grades"> Grades </TabsTrigger>
+            <TabsTrigger value="Recap"> Recap </TabsTrigger>
+          </TabsList>
+        </div>
+      </div>
+      <TabsContent value="Recap">
+        <div>
+          <p class="max-w-3xl mb-2 text-sm text-muted-foreground sm:text-base">
+            <template v-if="draftType === 'auction'">
+              Each player's winning bid and manager are shown on the player
+              card.
+            </template>
+            <template v-else-if="isReturningSleeperDynasty">
+              Each player card shows the manager who made the pick. Draft pick
+              scores are calculated based on each player's current positional
+              rank compared to where they were drafted.
+            </template>
+            <template v-else>
+              Draft pick scores are calculated based on each player's current
+              positional rank compared to where they were drafted. The sum of
+              these scores is listed by each manager's name.
+            </template>
+            <template v-if="showManagerProfilesLink">
+              Review historical draft tendencies in the
+              <button
+                type="button"
+                class="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                @click="openManagerProfiles"
+              >
+                Manager Profiles
+              </button>
+              tab.
+            </template>
+          </p>
+          <div
+            v-if="snakeDraftFormat || showManagerOnPickCard"
+            class="max-w-sm mb-4"
+          >
+            <Label for="sort-order" class="block text-sm mb-0.5">
+              {{ draftType === "auction" ? "Sort Players" : "Sort Picks" }}
+            </Label>
+            <Select id="sort-order" v-model="sortOrder">
+              <SelectTrigger if="sort-order" class="w-full sm:w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Draft Order">
+                  {{ draftType === "auction" ? "Auction Order" : "Draft Order" }}
+                </SelectItem>
+                <template v-if="draftType === 'auction'">
+                  <SelectItem value="Highest Winning Bid">
+                    Highest Winning Bid
+                  </SelectItem>
+                  <SelectItem value="Lowest Winning Bid">
+                    Lowest Winning Bid
+                  </SelectItem>
+                </template>
+                <template v-else>
+                  <SelectItem value="Highest Score"> Highest Score </SelectItem>
+                  <SelectItem value="Lowest Score"> Lowest Score </SelectItem>
+                </template>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </TabsContent>
+      <TabsContent value="Grades">
+        <div>
+          <p class="max-w-3xl mb-2 text-sm text-muted-foreground sm:text-base">
+            <template v-if="draftType === 'auction'">
+              Auction grades compare each winning bid with an expected price
+              based on Sleeper ADP and this league's actual bid distribution.
+            </template>
+            <template v-else>
+              Draft grades are calculated using each player's draft pick
+              position, ADP, and projections from Sleeper.
+            </template>
+          </p>
+          <div v-if="data.length === 0">
+            <Separator class="h-px mt-1 mb-4" />
+            <p class="w-full mt-3 text-balance sm:w-1/2">
+              Draft has not happened yet. Please come back after draft is
+              complete or try looking at the previous league season.
+            </p>
+          </div>
+        </div>
+      </TabsContent>
+      <TabsContent value="Recap">
+        <Separator class="h-px mt-1 mb-4" />
+        <div v-if="!loading" class="overflow-x-auto">
+          <div
+            v-if="!showManagerOnPickCard"
+            class="grid gap-0.5 mb-2"
+            :style="{
+              'grid-template-columns': `repeat(${draftSize}, minmax(100px, 1fr))`,
+              'min-width': '100px',
+            }"
+          >
+            <div
+              v-for="team in draftOrder"
+              class="flex flex-wrap items-center justify-center"
+            >
+              <p
+                v-if="team && draftType !== 'auction'"
+                class="mr-1.5 font-semibold"
+              >
+                {{ teamRanks[team.id] ? teamRanks[team.id].toFixed(1) : "0.0" }}
+              </p>
+              <img
+                alt="User avatar"
+                v-if="team && team.avatarImg"
+                class="w-8 h-8 rounded-full"
+                :src="team.avatarImg"
+                @error="handleImageError"
+              />
+              <svg
+                v-else
+                class="w-8 h-8"
+                aria-hidden="true"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  d="M10 0a10 10 0 1 0 10 10A10.011 10.011 0 0 0 10 0Zm0 5a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 13a8.949 8.949 0 0 1-4.951-1.488A3.987 3.987 0 0 1 9 13h2a3.987 3.987 0 0 1 3.951 3.512A8.949 8.949 0 0 1 10 18Z"
+                />
+              </svg>
+              <p v-if="team" class="w-20 text-sm text-center truncate">
+                {{ store.showUsernames ? team.username : team.name }}
+              </p>
+              <p v-else class="w-20 text-sm text-center truncate">No user</p>
+            </div>
+          </div>
+          <p
+            v-if="data.length === 0"
+            class="w-full mt-3 ml-2 text-balance sm:w-1/2"
+          >
+            Draft has not happened yet. Please come back after draft is complete
+            or try looking at the previous league season.
+          </p>
+          <div
+            class="grid gap-0.5 text-sm min-h-96"
+            :style="{
+              'grid-template-columns': `repeat(${draftSize}, minmax(${
+                showManagerOnPickCard ? '145px' : '100px'
+              }, 1fr))`,
+              'min-width': '100px',
+            }"
+          >
+            <div
+              v-if="snakeDraftFormat || showManagerOnPickCard"
+              v-for="pick in sortedData"
+              :key="pick.pickNumber"
+              class="block rounded-md shadow-xs"
+              :class="[
+                getBgColor(pick.position),
+                pick.keeper ? 'border-destructive border-t-4' : '',
+                showManagerOnPickCard ? 'h-28 p-2' : 'h-20 p-2.5',
+              ]"
+            >
+              <div
+                v-if="showManagerOnPickCard"
+                class="flex min-w-0 items-center gap-1.5 pb-1 mb-1 border-b border-black/10 dark:border-white/15 [&>img]:size-6 [&>svg]:size-6"
+              >
+                <ManagerAvatar
+                  class="shrink-0"
+                  :src="getTeamName(pick.userId).avatarImg"
+                  :alt="`${getManagerDisplayName(pick.userId)} avatar`"
+                />
+                <p
+                  class="min-w-0 text-xs font-semibold truncate"
+                  :title="getManagerDisplayName(pick.userId)"
+                >
+                  {{ getManagerDisplayName(pick.userId) }}
+                </p>
+              </div>
+              <p class="font-semibold truncate">
+                {{ `${pick.firstName.charAt(0)}. ${pick.lastName}` }}
+              </p>
+              <p>{{ `${pick.position} - ${pick.team}` }}</p>
+              <div class="flex justify-between text-sm">
+                <p v-if="draftType !== 'auction'">
+                  {{
+                    `${pick.round}.${getRoundPick(pick.draftSlot, pick.round)}`
+                  }}
+                </p>
+                <span
+                  class="font-medium me-2 px-2 py-0.5 rounded-full custom-margin"
+                  :class="[getValueColor(parseFloat(pick.pickRank))]"
+                >
+                  {{
+                    draftType === "auction" ? `$${pick.amount}` : pick.pickRank
+                  }}
+                </span>
+              </div>
+            </div>
+            <!-- auction order or dynasty linear drafts -->
+            <div v-else v-for="team in draftOrder">
+              <div v-for="pick in sortedData">
+                <div
+                  v-if="team.id === pick.userId"
+                  class="block h-20 p-2.5 mb-0.5 text-gray-900 rounded-md shadow-xs dark:shadow-gray-800 dark:text-gray-200"
+                  :class="[
+                    getBgColor(pick.position),
+                    pick.keeper ? 'border-destructive border-t-4' : '',
+                  ]"
+                >
+                  <p class="font-semibold truncate">
+                    {{ `${pick.firstName.charAt(0)}. ${pick.lastName}` }}
+                  </p>
+                  <p>{{ `${pick.position} - ${pick.team}` }}</p>
+                  <div class="flex justify-between text-sm">
+                    <p v-if="draftType !== 'auction'">
+                      {{
+                        `${pick.round}.${getRoundPick(
+                          pick.draftSlot,
+                          pick.round
+                        )}`
+                      }}
+                    </p>
+                    <span
+                      v-if="draftType === 'auction'"
+                      class="font-medium me-2 px-2 py-0.5 rounded-full custom-margin"
+                      :class="[getValueColor(parseFloat(pick.pickRank))]"
+                    >
+                      ${{ pick.amount }}
+                    </span>
+                    <span
+                      v-else
+                      class="font-medium me-2 px-2 py-0.5 rounded-full custom-margin"
+                      :class="[getValueColor(parseFloat(pick.pickRank))]"
+                    >
+                      {{ pick.pickRank }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p
+            v-if="store.currentLeague?.seasonType === 'Keeper'"
+            class="mt-4 text-xs text-muted-foreground footer-font"
+          >
+            Picks with a red top border are keepers.
+          </p>
+        </div>
+        <div
+          v-else
+          role="status"
+          class="overflow-x-auto"
+          aria-busy="true"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading draft data...</span>
+          <div
+            class="grid gap-1 text-sm min-h-96"
+            :style="{
+              'grid-template-columns': `repeat(${draftSize}, minmax(100px, 1fr))`,
+              'min-width': '100px',
+            }"
+          >
+            <div
+              v-for="index in draftSize * 6"
+              :key="`draft-pick-skeleton-${index}`"
+              class="flex h-20 flex-col justify-center gap-2 rounded-md border border-border bg-background p-2.5 shadow-xs"
+            >
+              <Skeleton class="w-4/5 h-4 bg-muted dark:bg-muted/70" />
+              <Skeleton class="w-1/2 h-3 bg-muted dark:bg-muted/70" />
+              <Skeleton class="w-2/3 h-3 bg-muted dark:bg-muted/70" />
+            </div>
+          </div>
+        </div>
+      </TabsContent>
+      <TabsContent value="Grades">
+        <DraftGrades
+          v-if="data.length > 0 && store.currentTab === 'Draft'"
+          :draft-data="data"
+          :scoring-type="scoringType"
+        />
+      </TabsContent>
+    </Tabs>
+  </SectionCard>
+</template>
+<style lang="css" scoped>
+.custom-margin {
+  margin-right: -6px;
+}
+</style>

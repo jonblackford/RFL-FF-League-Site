@@ -1,0 +1,338 @@
+<script setup lang="ts">
+import { ref, computed, watch } from "vue";
+import { max, mean, min, zip } from "@/lib/collection";
+import { getChartTheme, getChartTooltipTheme } from "@/lib/chartTheme";
+import { useStore } from "../../store/store";
+import { getPowerRanking, winsOnWeek } from "../../api/helper";
+import {
+  RosterType,
+  TableDataType,
+  PowerRankingEntry,
+} from "../../types/types";
+import { getOptimalProjectedLineup } from "@/lib/lineup";
+import PowerRankingCard from "./PowerRankingCard.vue";
+import SectionCard from "../layout/SectionCard.vue";
+const store = useStore();
+
+const props = defineProps<{
+  tableData: TableDataType[];
+  regularSeasonLength: number;
+  totalRosters: number;
+}>();
+
+const preseasonRank = computed(() => {
+  const currentLeague = store.currentLeague;
+  if (currentLeague?.rosters) {
+    const projectionsAreLoaded = currentLeague.rosters.every(
+      (roster) => roster.projections && roster.projections.length > 0
+    );
+
+    if (!projectionsAreLoaded) {
+      return [];
+    }
+
+    const results = currentLeague.rosters.map((roster: RosterType) => {
+      const projections = roster.projections!;
+      const optimalLineup = getOptimalProjectedLineup(
+        projections,
+        currentLeague.rosterPositions
+      );
+      return {
+        rosterId: roster.rosterId,
+        preseasonScore: Number(
+          (
+            optimalLineup.total /
+            Math.max(1, optimalLineup.startingSlots.length)
+          ).toFixed(2)
+        ),
+      };
+    });
+    return results;
+  } else if (store.leagueInfo.length === 0) {
+    // Fake data for homepage
+    return [
+      { rosterId: 1, preseasonScore: 100 },
+      { rosterId: 2, preseasonScore: 114 },
+      { rosterId: 3, preseasonScore: 126.3 },
+      { rosterId: 4, preseasonScore: 118.9 },
+      { rosterId: 5, preseasonScore: 154 },
+      { rosterId: 6, preseasonScore: 133 },
+      { rosterId: 7, preseasonScore: 127.8 },
+      { rosterId: 8, preseasonScore: 141.6 },
+      { rosterId: 9, preseasonScore: 129.1 },
+      { rosterId: 10, preseasonScore: 137 },
+    ];
+  }
+  return [];
+});
+
+const hasCompletePreseasonRankings = computed(() => {
+  return (
+    preseasonRank.value.length > 0 &&
+    preseasonRank.value.length === props.totalRosters
+  );
+});
+
+const chartIncludesPreseasonRankings = ref(hasCompletePreseasonRankings.value);
+
+const chartCategories = computed(() => {
+  const weeks = Array(props.regularSeasonLength)
+    .fill(0)
+    .map((_, i) => i + 1);
+  return chartIncludesPreseasonRankings.value ? ["Preseason", ...weeks] : weeks;
+});
+
+const buildPowerRankings = (includePreseasonRankings: boolean) => {
+  const result: PowerRankingEntry[] = [];
+  const ratingsContainer: number[][] = [];
+  props.tableData.forEach((value: TableDataType) => {
+    const ratingArr: number[] = [];
+    if (value.recordByWeek && value.points) {
+      value.points.forEach((_: number, week: number) => {
+        const weekLength =
+          store.currentLeague?.medianScoring === 1
+            ? value.recordByWeek.length / 2
+            : value.recordByWeek.length;
+        if (week < weekLength) {
+          const currentWins = winsOnWeek(value.recordByWeek, week);
+          const currentLosses = week + 1 - currentWins;
+          ratingArr.push(
+            getPowerRanking(
+              mean(value.points.slice(0, week + 1)),
+              Number(max(value.points.slice(0, week + 1))),
+              Number(min(value.points.slice(0, week + 1))),
+              currentWins / (currentWins + currentLosses)
+            )
+          );
+        }
+      });
+    }
+    if (includePreseasonRankings) {
+      const preseasonScore = preseasonRank.value.find(
+        (user) => user.rosterId === value.rosterId
+      )?.preseasonScore;
+      ratingArr.unshift(preseasonScore || 0);
+    }
+    ratingsContainer.push(ratingArr);
+    result.push({
+      name: store.showUsernames ? value.username : value.name,
+      type: "line",
+      ratings: ratingArr,
+    });
+  });
+  const orderedArrs = zip(...ratingsContainer) as number[][];
+  orderedArrs.forEach((arr) => {
+    arr.sort((a, b) => b - a);
+  });
+  result.forEach((user) => {
+    const data: number[] = [];
+    user.ratings.forEach((value: number, index: number) => {
+      data.push(orderedArrs[index].indexOf(value) + 1);
+    });
+    user["data"] = data;
+  });
+  return result;
+};
+
+const weeklyPowerRankings = computed(() => buildPowerRankings(false));
+
+const powerRankings = computed(() =>
+  buildPowerRankings(hasCompletePreseasonRankings.value)
+);
+
+const chartPowerRankings = computed(() =>
+  chartIncludesPreseasonRankings.value
+    ? powerRankings.value
+    : weeklyPowerRankings.value
+);
+
+const updateChartColor = () => {
+  chartOptions.value = {
+    ...chartOptions.value,
+    chart: {
+      width: "98%",
+      foreColor: getChartTheme().foreground,
+      toolbar: {
+        show: false,
+      },
+      zoom: {
+        enabled: false,
+      },
+      animations: {
+        enabled: false,
+      },
+    },
+    xaxis: {
+      ...chartOptions.value.xaxis,
+      categories: chartCategories.value,
+    },
+    tooltip: {
+      theme: getChartTooltipTheme(store.darkMode),
+      x: {
+        show: true,
+        formatter: (x: number) => `Week ${x}`,
+      },
+    },
+    markers: {
+      size: 6,
+      strokeWidth: 2,
+      strokeColors: "hsl(var(--border))",
+      hover: {
+        size: 7,
+      },
+    },
+    yaxis: {
+      reversed: true,
+      min: 1,
+      stepSize: 1,
+      tickAmount: props.totalRosters - 1,
+      title: {
+        text: "Ranking",
+        offsetX: -10,
+        style: {
+          fontSize: "16px",
+          fontFamily:
+            "ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji",
+          fontWeight: 600,
+        },
+      },
+    },
+  };
+};
+
+watch(
+  [
+    () => store.darkMode,
+    () => store.showUsernames,
+    () => store.currentLeagueId,
+    chartIncludesPreseasonRankings,
+  ],
+  () => {
+    updateChartColor();
+  }
+);
+
+watch(hasCompletePreseasonRankings, (isComplete) => {
+  chartIncludesPreseasonRankings.value = isComplete;
+});
+
+const chartOptions = ref({
+  chart: {
+    width: "98%",
+    foreColor: getChartTheme().foreground,
+    toolbar: {
+      show: false,
+    },
+    zoom: {
+      enabled: false,
+    },
+    animations: {
+      enabled: false,
+    },
+  },
+  colors: [
+    "hsl(var(--chart-rank-1))",
+    "hsl(var(--chart-rank-2))",
+    "hsl(var(--chart-rank-3))",
+    "hsl(var(--chart-rank-4))",
+    "hsl(var(--chart-rank-5))",
+    "hsl(var(--chart-rank-6))",
+    "hsl(var(--chart-rank-7))",
+    "hsl(var(--chart-rank-8))",
+    "hsl(var(--chart-rank-9))",
+    "hsl(var(--chart-rank-10))",
+    "hsl(var(--chart-rank-11))",
+    "hsl(var(--chart-rank-12))",
+  ],
+  xaxis: {
+    categories: chartCategories.value,
+    labels: {
+      hideOverlappingLabels: false,
+    },
+    title: {
+      text: "Week",
+      style: {
+        fontSize: "16px",
+        fontFamily:
+          "ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji",
+        fontWeight: 600,
+      },
+    },
+  },
+  yaxis: {
+    reversed: true,
+    min: 1,
+    stepSize: 1,
+    tickAmount: props.totalRosters - 1,
+    title: {
+      text: "Ranking",
+      offsetX: -10,
+      style: {
+        fontSize: "16px",
+        fontFamily:
+          "ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji",
+        fontWeight: 600,
+      },
+    },
+  },
+  tooltip: {
+    theme: getChartTooltipTheme(store.darkMode),
+    x: {
+      show: true,
+      formatter: (x: number) => `Week ${x}`,
+    },
+  },
+  stroke: {
+    curve: "straight",
+    width: 5,
+  },
+  markers: {
+    size: 6,
+    strokeWidth: 2,
+    strokeColors: "hsl(var(--border))",
+    hover: {
+      size: 7,
+    },
+  },
+  legend: {
+    offsetX: 20,
+  },
+});
+</script>
+<template>
+  <div class="flex flex-wrap md:flex-nowrap">
+    <PowerRankingCard
+      v-if="store.currentTab === 'Power Rankings'"
+      :power-rankings="powerRankings"
+      :regular-season-length="props.regularSeasonLength"
+      :has-preseason-rankings="hasCompletePreseasonRankings"
+      class="w-full mb-4 md:w-1/3 md:mr-4 md:mb-0"
+    />
+    <SectionCard
+      class="w-full min-w-0"
+      :class="{ 'md:w-2/3': store.currentTab === 'Power Rankings' }"
+    >
+      <div class="flex justify-between">
+        <div>
+          <h2 class="pb-2 heading-section">
+            Power Rankings
+          </h2>
+        </div>
+      </div>
+      <apexchart
+        width="98%"
+        height="475"
+        type="line"
+        :options="chartOptions"
+        :series="chartPowerRankings"
+      ></apexchart>
+      <p class="mt-8 text-caption sm:-mb-4 footer-font">
+        Ranking formula:
+        <span class="italic"
+          >((average weekly score * 6) + ((highest score + lowest score) * 2) +
+          (win percentage * 400)) / 10</span
+        >
+      </p>
+    </SectionCard>
+  </div>
+</template>

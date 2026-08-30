@@ -1,0 +1,228 @@
+<script setup lang="ts">
+import { ref, computed, watch } from "vue";
+import { useStore } from "../../store/store";
+import { TableDataType } from "../../types/types";
+import { Card } from "../ui/card";
+import { mobileCategoricalChartResponsive } from "@/lib/chartResponsive";
+import { getChartTheme, getChartTooltipTheme } from "@/lib/chartTheme";
+const store = useStore();
+
+const props = defineProps<{
+  tableData: TableDataType[];
+}>();
+
+const tableDataCopy = computed(() => {
+  const result = [...props.tableData];
+  return result.sort((a, b) => b.pointsAgainst - a.pointsAgainst);
+});
+
+const seriesData = computed(() => {
+  const averagePoints =
+    tableDataCopy.value.reduce((sum, team) => sum + team.pointsFor, 0) /
+    tableDataCopy.value.length /
+    tableDataCopy.value[0]?.recordByWeek?.length;
+  const result = tableDataCopy.value.map((user: TableDataType) => {
+    return parseFloat(
+      (user.pointsAgainst / user.recordByWeek?.length - averagePoints).toFixed(
+        2
+      )
+    );
+  });
+  return [{ name: "Avg. Point Difference", data: result }];
+});
+
+const categories = computed(() => {
+  return tableDataCopy.value.map((user) =>
+    store.showUsernames
+      ? user.username
+        ? user.username
+        : ""
+      : user.name
+        ? user.name
+        : ""
+  );
+});
+
+const updateChartColor = () => {
+  chartOptions.value = {
+    ...chartOptions.value,
+    chart: {
+      type: "bar",
+      foreColor: getChartTheme().foreground,
+      toolbar: {
+        show: false,
+      },
+      zoom: {
+        enabled: false,
+      },
+      animations: {
+        enabled: false,
+      },
+    },
+    tooltip: {
+      theme: getChartTooltipTheme(store.darkMode),
+      y: {
+        show: true,
+        formatter: (x: number) => {
+          if (Number.isInteger(x)) {
+            return `${x}`;
+          }
+          return `${x.toFixed(2)}`;
+        },
+      },
+      marker: {
+        show: false,
+      },
+    },
+    xaxis: {
+      categories: categories.value,
+      tickAmount: categories.value.length - 1,
+      hideOverlappingLabels: false,
+      labels: {
+        formatter: function (str: string) {
+          const n = 17;
+          return str.length > n ? str.slice(0, n - 1) + "..." : str;
+        },
+      },
+      title: {
+        text: "League Manager",
+        offsetX: -20,
+        offsetY: 3,
+        style: {
+          fontSize: "16px",
+          fontFamily:
+            "ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji",
+          fontWeight: 600,
+        },
+      },
+    },
+    yaxis: {
+      tickAmount: 4,
+      title: {
+        text: "Point Difference",
+        offsetX: -10,
+        style: {
+          fontSize: "16px",
+          fontFamily:
+            "ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji",
+          fontWeight: 600,
+        },
+      },
+    },
+  };
+};
+
+watch(
+  [
+    () => store.darkMode,
+    () => store.showUsernames,
+    () => store.currentLeagueId,
+  ],
+  () => {
+    updateChartColor();
+  }
+);
+
+const chartOptions = ref({
+  responsive: mobileCategoricalChartResponsive(),
+  chart: {
+    foreColor: getChartTheme().foreground,
+    type: "bar",
+    toolbar: {
+      show: false,
+    },
+    zoom: {
+      enabled: false,
+    },
+    animations: {
+      enabled: false,
+    },
+  },
+  plotOptions: {
+    bar: {
+      columnWidth: "75%",
+    },
+  },
+  colors: ["hsl(var(--chart-1))"],
+  dataLabels: {
+    enabled: false,
+  },
+  tooltip: {
+    theme: getChartTooltipTheme(store.darkMode),
+    y: {
+      show: true,
+      formatter: (x: number) => {
+        if (Number.isInteger(x)) {
+          return `${x}`;
+        }
+        return `${x.toFixed(2)}`;
+      },
+    },
+    marker: {
+      show: false,
+    },
+  },
+  xaxis: {
+    categories: categories.value,
+    tickAmount: categories.value.length - 1,
+    hideOverlappingLabels: false,
+    labels: {
+      formatter: function (str: string) {
+        const n = 17;
+        return str.length > n ? str.slice(0, n - 1) + "..." : str;
+      },
+    },
+    title: {
+      text: "League Manager",
+      offsetY: 3,
+      offsetX: -20,
+      style: {
+        fontSize: "16px",
+        fontFamily:
+          "ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji",
+        fontWeight: 600,
+      },
+    },
+  },
+  yaxis: {
+    tickAmount: 4,
+    title: {
+      text: "Point Difference",
+      offsetX: -10,
+      style: {
+        fontSize: "16px",
+        fontFamily:
+          "ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji",
+        fontWeight: 600,
+      },
+    },
+  },
+});
+</script>
+<template>
+  <Card class="w-full min-w-0 p-4 overflow-hidden md:p-6">
+    <div class="flex justify-between">
+      <div>
+        <h1 class="pb-2 text-2xl font-semibold tracking-tight">
+          Strength of Schedule
+        </h1>
+      </div>
+    </div>
+    <apexchart
+      width="99.9%"
+      height="475"
+      type="bar"
+      :options="chartOptions"
+      :series="seriesData"
+      class="overflow-hidden"
+    ></apexchart>
+    <p
+      class="text-xs text-muted-foreground sm:-mb-4 footer-font"
+      :class="props.tableData.length <= 12 ? 'mt-2' : 'mt-6'"
+    >
+      Average difference between a team’s opponents’ points per game and the
+      league‑wide average points per game. Positive values indicate a more
+      difficult schedule.
+    </p>
+  </Card>
+</template>

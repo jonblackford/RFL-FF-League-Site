@@ -1,0 +1,451 @@
+<script setup lang="ts">
+import { ref, computed, shallowRef, watch, onMounted } from "vue";
+import { getLeagueKey, useStore } from "../../store/store";
+import { RosterType, LeagueInfoType } from "../../types/types";
+import { getProjections } from "../../api/sleeperApi";
+import HeatMap from "./HeatMap.vue";
+import Card from "../ui/card/Card.vue";
+import { mapWithConcurrency } from "@/lib/async";
+import { getChartTheme, getChartTooltipTheme } from "@/lib/chartTheme";
+import { loadDemoProjections } from "@/data/demo/loaders";
+import {
+  getEligiblePositionsForSlot,
+  getOptimalProjectedLineup,
+  getStartingRosterSlots,
+} from "@/lib/lineup";
+
+const store = useStore();
+const loading = ref(false);
+type ProjectionByPosition = { projection: number; position: string };
+type FormattedProjectionRoster = {
+  name: string;
+  username?: string;
+  data: ProjectionByPosition[];
+  total: number;
+};
+const demoProjectionData = shallowRef<FormattedProjectionRoster[]>([]);
+
+const loadDemoData = async () => {
+  const { fakeProjectionData } = await loadDemoProjections();
+  demoProjectionData.value = fakeProjectionData as FormattedProjectionRoster[];
+};
+
+const hasProjectionData = (league: LeagueInfoType) =>
+  league.rosters.every(
+    (roster) => roster.projections && roster.projections.length > 0
+  );
+
+const categories = computed(() => {
+  return formattedData.value.map((user) =>
+    store.showUsernames
+      ? user.username
+        ? user.username
+        : ""
+      : user.name
+        ? user.name
+        : ""
+  );
+});
+
+onMounted(async () => {
+  if (!store.currentLeague) {
+    await loadDemoData();
+    updateChartColor();
+    return;
+  }
+  if (
+    store.leagueInfo.length > 0 &&
+    store.currentLeague &&
+    !hasProjectionData(store.currentLeague)
+  ) {
+    loading.value = true;
+    try {
+      await getData();
+      updateChartColor();
+    } finally {
+      loading.value = false;
+    }
+  }
+});
+
+watch(
+  () => store.currentLeagueId,
+  async () => {
+    const currentLeague = store.currentLeague;
+    if (!currentLeague) {
+      await loadDemoData();
+      updateChartColor();
+      return;
+    }
+
+    if (!hasProjectionData(currentLeague)) {
+      loading.value = true;
+      try {
+        await getData();
+        updateChartColor();
+      } finally {
+        loading.value = false;
+      }
+    } else {
+      updateChartColor();
+    }
+  }
+);
+
+const getData = async () => {
+  const currentLeague = store.currentLeague;
+  if (!currentLeague) {
+    return;
+  }
+
+  const lastScoredWeek =
+    currentLeague.status === "complete"
+      ? 0
+      : currentLeague.lastScoredWeek
+        ? currentLeague.lastScoredWeek
+        : 0;
+
+  await mapWithConcurrency(
+    currentLeague.rosters,
+    2,
+    async (roster: RosterType) => {
+      const singleRoster: ProjectionByPosition[] = [];
+      if (!roster.players) return [];
+
+      const projections = await mapWithConcurrency(
+        roster.players,
+        4,
+        (player: string) =>
+          getProjections(
+            player,
+            currentLeague.season,
+            lastScoredWeek,
+            currentLeague.scoringType
+          )
+      );
+
+      singleRoster.push(...projections);
+      store.addProjectionData(
+        getLeagueKey(currentLeague),
+        roster.id,
+        singleRoster
+      );
+    }
+  );
+};
+
+const formattedData = computed(() => {
+  if (
+    store.leagueInfo.length == 0 ||
+    !store.currentLeague
+  ) {
+    return demoProjectionData.value;
+  }
+  const startingSlots = getStartingRosterSlots(
+    store.currentLeague.rosterPositions
+  );
+  const preferredPositionOrder = [
+    "RB",
+    "WR",
+    "QB",
+    "TE",
+    "K",
+    "DEF",
+    "DL",
+    "LB",
+    "DB",
+  ];
+  const getPositionOrder = (position: string) => {
+    const index = preferredPositionOrder.indexOf(position);
+    return index === -1 ? preferredPositionOrder.length : index;
+  };
+  const positionGroups = [
+    ...new Set(startingSlots.flatMap(getEligiblePositionsForSlot)),
+  ].sort(
+    (a, b) =>
+      getPositionOrder(a) - getPositionOrder(b) || a.localeCompare(b)
+  );
+
+  const nameMapping = new Map(
+    store.currentLeague.users.map((user) => [
+      user.id,
+      user.name,
+    ])
+  );
+
+  const userNameMapping = new Map(
+    store.currentLeague.users.map((user) => [
+      user.id,
+      user.username,
+    ])
+  );
+  const mappedData: Array<{
+    name: string;
+    username?: string;
+    data: ProjectionByPosition[];
+  }> = [];
+  store.currentLeague.rosters.forEach(
+    (roster: RosterType) => {
+      mappedData.push({
+        name: nameMapping.get(roster.id) ?? "",
+        username: userNameMapping.get(roster.id),
+        data: roster.projections ?? [],
+      });
+    }
+  );
+  const result = mappedData.map(
+    (roster) => {
+      const filteredData = roster.data ? roster.data : [];
+      const optimalLineup = getOptimalProjectedLineup(
+        filteredData,
+        store.currentLeague.rosterPositions
+      );
+      const combined = positionGroups.map((position) => ({
+        position,
+        projection: optimalLineup.positionTotals[position] ?? 0,
+      }));
+
+      return {
+        name: roster.name,
+        username: roster.username,
+        data: combined,
+        total: optimalLineup.total,
+      };
+    }
+  );
+  return result.sort((a, b) => b.total - a.total);
+});
+
+const seriesData = computed(() => {
+  const positions = [
+    ...new Set(
+      formattedData.value.flatMap((roster) =>
+        roster.data.map((player) => player.position)
+      )
+    ),
+  ];
+
+  return positions.map((position) => ({
+    name: position,
+    data: formattedData.value.map(
+      (roster) =>
+        roster.data.find((player) => player.position === position)
+          ?.projection ?? 0
+    ),
+  }));
+});
+
+watch([() => store.darkMode, () => store.showUsernames], () => {
+  updateChartColor();
+});
+
+const updateChartColor = () => {
+  chartOptions.value = {
+    ...chartOptions.value,
+    chart: {
+      type: "bar",
+      stacked: true,
+      foreColor: getChartTheme().foreground,
+      toolbar: {
+        show: false,
+      },
+      zoom: {
+        enabled: false,
+      },
+      animations: {
+        enabled: false,
+      },
+    },
+    stroke: {
+      colors: ["hsl(var(--chart-contrast))"],
+      width: 1,
+    },
+    fill: {
+      opacity: 1,
+    },
+    plotOptions: {
+      bar: {
+        horizontal: true,
+        dataLabels: {
+          total: {
+            enabled: true,
+            offsetX: 3,
+            style: {
+              fontSize: "13px",
+              fontWeight: 900,
+              color: "hsl(var(--foreground))",
+            },
+          },
+        },
+      },
+    },
+    tooltip: {
+      theme: getChartTooltipTheme(store.darkMode),
+      marker: {
+        show: false,
+      },
+    },
+    xaxis: {
+      categories: categories.value,
+    },
+    yaxis: {
+      labels: {
+        formatter: function (str: string) {
+          const n = 15;
+          return str?.length > n ? str.slice(0, n - 1) + "..." : str;
+        },
+      },
+    },
+  };
+};
+
+const chartOptions = ref({
+  chart: {
+    foreColor: getChartTheme().foreground,
+    type: "bar",
+    stacked: true,
+    toolbar: {
+      show: false,
+    },
+    zoom: {
+      enabled: false,
+    },
+    animations: {
+      enabled: false,
+    },
+  },
+  colors: [
+    "hsl(var(--chart-1))",
+    "hsl(var(--chart-2))",
+    "hsl(var(--chart-3))",
+    "hsl(var(--chart-4))",
+    "hsl(var(--chart-5))",
+    "hsl(var(--chart-6))",
+  ],
+  stroke: {
+    colors: ["hsl(var(--chart-contrast))"],
+    width: 1,
+  },
+  fill: {
+    opacity: 1,
+  },
+  plotOptions: {
+    bar: {
+      horizontal: true,
+      dataLabels: {
+        total: {
+          enabled: true,
+          offsetX: 3,
+          style: {
+            fontSize: "13px",
+            fontWeight: 900,
+            color: "hsl(var(--foreground))",
+          },
+        },
+      },
+    },
+  },
+  tooltip: {
+    theme: getChartTooltipTheme(store.darkMode),
+    marker: {
+      show: false,
+    },
+  },
+  xaxis: {
+    categories: categories.value,
+  },
+  yaxis: {
+    labels: {
+      formatter: function (str: string) {
+        const n = 15;
+        return str.length > n ? str.slice(0, n - 1) + "..." : str;
+      },
+    },
+  },
+});
+</script>
+<template>
+  <div>
+    <div v-if="!loading">
+      <Card class="w-full min-w-0 p-4 md:p-6">
+        <div class="flex justify-between">
+          <div>
+            <h1 class="pb-2 text-2xl font-semibold tracking-tight">
+              Roster Projections
+            </h1>
+          </div>
+        </div>
+        <apexchart
+          type="bar"
+          height="350"
+          :options="chartOptions"
+          :series="seriesData"
+        ></apexchart>
+        <p class="mt-6 text-xs sm:-mb-4 footer-font text-muted-foreground">
+          Rest of season projected points data from the Sleeper API. If the
+          season is complete, entire season projections are shown.
+        </p>
+      </Card>
+      <HeatMap :formattedData="formattedData" class="mt-4" />
+    </div>
+    <div
+      v-else
+      role="status"
+      class="p-4 border border-border rounded-lg bg-card shadow-xs animate-pulse md:p-6 custom-height"
+    >
+      <p class="flex justify-center mb-4 text-xl font-semibold sm:-mb-6">
+        Loading projection data...
+      </p>
+      <div
+        class="h-2.5 bg-muted rounded-full w-32 mb-2.5"
+      ></div>
+      <div
+        class="w-48 h-2 mb-4 bg-muted rounded-full sm:mb-10"
+      ></div>
+      <div class="flex items-baseline mt-4">
+        <div
+          class="w-full h-40 bg-muted rounded-t-lg"
+        ></div>
+        <div
+          class="w-full bg-muted rounded-t-lg h-44 ms-6"
+        ></div>
+        <div
+          class="w-full bg-muted rounded-t-lg h-60 ms-6"
+        ></div>
+        <div
+          class="w-full h-40 bg-muted rounded-t-lg ms-6"
+        ></div>
+        <div
+          class="w-full h-32 bg-muted rounded-t-lg ms-6"
+        ></div>
+        <div
+          class="w-full bg-muted rounded-t-lg h-36 ms-6"
+        ></div>
+        <div
+          class="w-full bg-muted rounded-t-lg h-60 sm:h-72 ms-6"
+        ></div>
+        <div
+          class="w-full bg-muted rounded-t-lg h-44 ms-6"
+        ></div>
+        <div
+          class="w-full bg-muted rounded-t-lg h-44 ms-6"
+        ></div>
+        <div
+          class="w-full h-64 bg-muted rounded-t-lg ms-6"
+        ></div>
+        <div
+          class="w-full h-64 bg-muted rounded-t-lg ms-6"
+        ></div>
+        <div
+          class="w-full bg-muted rounded-t-lg h-44 ms-6"
+        ></div>
+      </div>
+      <span class="sr-only">Loading...</span>
+    </div>
+  </div>
+</template>
+<style scoped>
+.custom-height {
+  height: 400px;
+}
+</style>

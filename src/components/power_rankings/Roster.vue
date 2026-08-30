@@ -1,0 +1,216 @@
+<script setup lang="ts">
+import { computed, ref } from "vue";
+import { useStore } from "../../store/store";
+import { TableDataType, PlayerType } from "../../types/types";
+import {
+  Select,
+  SelectContent,
+  SelectTrigger,
+  SelectItem,
+  SelectValue,
+} from "../ui/select";
+import Separator from "../ui/separator/Separator.vue";
+import Label from "../ui/label/Label.vue";
+
+const store = useStore();
+type RosterPlayer = Partial<PlayerType>;
+
+const props = defineProps<{
+  playerData: Record<string, RosterPlayer[]>;
+  tableData: TableDataType[];
+}>();
+
+const getNameFromId = (rosterId: number) => {
+  const userObj = props.tableData.find((user) => user.rosterId === rosterId);
+  if (userObj) {
+    return store.showUsernames ? userObj.username : userObj.name;
+  }
+};
+
+const groupedPlayerData = computed(() => {
+  const result: Record<string, Record<string, RosterPlayer[]>> = {};
+  for (const userId in props.playerData) {
+    const players = props.playerData[userId];
+    const positions: Record<string, RosterPlayer[]> = {};
+    for (const player of players) {
+      const position = player.position ?? "UNKNOWN";
+      if (!positions[position]) {
+        positions[position] = [];
+      }
+      positions[position].push(player);
+    }
+    // Sort each position group by player.rank
+    for (const pos in positions) {
+      positions[pos].sort(
+        (a, b) =>
+          (a.rank ?? Number.POSITIVE_INFINITY) -
+          (b.rank ?? Number.POSITIVE_INFINITY)
+      );
+    }
+    result[userId] = positions;
+  }
+  return result;
+});
+
+const managers = computed(() => {
+  const currentLeague = store.currentLeague;
+  if (currentLeague) {
+    const currentRosterIds = currentLeague.rosters.map((roster) => roster.id);
+    const result = currentLeague.users
+      .filter((user) => currentRosterIds.includes(user.id))
+      .map((user) =>
+        store.showUsernames ? (user.username ?? user.name) : user.name
+      );
+    result.unshift("All Managers");
+    return result;
+  } else if (store.leagueInfo.length == 0) {
+    return props.tableData.map((user) => user.name);
+  }
+  return [];
+});
+
+const currentManager = ref(managers.value[0] ?? "");
+
+const getValueColor = (value: number) => {
+  if (value <= 15)
+    return "performance-excellent";
+  if (value <= 25)
+    return "performance-good";
+  if (value <= 35)
+    return "performance-average";
+  if (value <= 45)
+    return "performance-poor";
+  return "performance-bad";
+};
+</script>
+<template>
+  <div>
+    <Label class="block mb-1 text-sm">Manager</Label>
+    <Select v-model="currentManager">
+      <SelectTrigger class="w-full sm:w-52">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem v-for="manager in managers" :key="manager" :value="manager">
+          {{ manager }}
+        </SelectItem>
+      </SelectContent>
+    </Select>
+    <Separator class="my-4" />
+    <div
+      v-for="(positions, userId) in groupedPlayerData"
+      :key="userId"
+      class=""
+    >
+      <div
+        v-if="getNameFromId(Number(userId)) === currentManager"
+        class="flex flex-wrap gap-4 sm:gap-12"
+      >
+        <div
+          class="w-full overflow-x-hidden sm:w-48"
+          v-for="position in ['QB', 'RB', 'WR', 'TE', 'K', 'DEF']"
+          :key="position"
+        >
+          <template v-if="positions[position] && positions[position].length">
+            <p class="mb-2 text-lg font-semibold">
+              {{ position }}
+            </p>
+            <div class="gap-2">
+              <div
+                v-for="player in positions[position]"
+                :key="player.id"
+                class="flex justify-between mb-2"
+              >
+                <img
+                  v-if="player.position !== 'DEF'"
+                  class="object-cover w-12 mr-2 -mt-1 -ml-2 rounded-full"
+                  :src="`https://sleepercdn.com/content/nfl/players/thumb/${player.id}.jpg`"
+                  alt="player_img"
+                />
+                <img
+                  v-else
+                  class="w-8 mx-2 rounded-full h-7"
+                  :src="`https://sleepercdn.com/images/team_logos/nfl/${(player.id ?? '').toLowerCase()}.png`"
+                  alt="Team avatar"
+                />
+                <p class="w-auto truncate sm:w-28">
+                  {{
+                    player.position !== "DEF" && player.firstName
+                      ? `${player.firstName[0]}.`
+                      : ""
+                  }}
+                  {{ player.lastName }}
+                </p>
+                <span
+                  :class="[
+                    player.rank
+                      ? getValueColor(player.rank)
+                      : 'bg-muted text-muted-foreground',
+                  ]"
+                  class="text-sm px-2.5 py-1 mb-1 rounded-full float-end ml-2"
+                  >{{ player.rank ? player.rank : "N/A" }}</span
+                >
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+      <div v-else-if="currentManager === 'All Managers'">
+        <p class="mb-1 text-lg font-semibold">
+          {{ getNameFromId(Number(userId)) }}
+        </p>
+        <div class="flex flex-wrap gap-4 sm:gap-12">
+          <div
+            class="w-full overflow-x-hidden sm:w-48"
+            v-for="position in ['QB', 'RB', 'WR', 'TE', 'K', 'DEF']"
+            :key="position"
+          >
+            <template v-if="positions[position] && positions[position].length">
+              <p class="mb-2 text-lg font-semibold">
+                {{ position }}
+              </p>
+              <div class="gap-2">
+                <div
+                  v-for="player in positions[position]"
+                  :key="player.id"
+                  class="flex justify-between mb-2"
+                >
+                  <img
+                    v-if="player.position !== 'DEF'"
+                    class="object-cover w-12 mr-2 -mt-1 -ml-2 rounded-full"
+                    :src="`https://sleepercdn.com/content/nfl/players/thumb/${player.id}.jpg`"
+                    alt="player_img"
+                  />
+                  <img
+                    v-else
+                    class="w-8 mx-2 rounded-full h-7"
+                    :src="`https://sleepercdn.com/images/team_logos/nfl/${(player.id ?? '').toLowerCase()}.png`"
+                    alt="Team avatar"
+                  />
+                  <p class="w-auto truncate sm:w-28">
+                    {{
+                      player.position !== "DEF" && player.firstName
+                        ? `${player.firstName[0]}.`
+                        : ""
+                    }}
+                    {{ player.lastName }}
+                  </p>
+                  <span
+                    :class="[
+                      player.rank
+                        ? getValueColor(player.rank)
+                        : 'bg-muted text-muted-foreground',
+                    ]"
+                    class="text-xs px-2.5 py-1 mb-1 rounded-full float-end ml-2"
+                    >{{ player.rank ? player.rank : "N/A" }}</span
+                  >
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+        <Separator class="h-px my-3 mr-6" />
+      </div>
+    </div>
+  </div>
+</template>

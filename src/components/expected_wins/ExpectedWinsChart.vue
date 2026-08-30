@@ -1,0 +1,182 @@
+<script setup lang="ts">
+import { ref, computed, watch } from "vue";
+import { useStore } from "../../store/store";
+import { TableDataType } from "../../types/types";
+import Card from "../ui/card/Card.vue";
+import { mobileCategoricalChartResponsive } from "@/lib/chartResponsive";
+import { getChartTheme, getChartTooltipTheme } from "@/lib/chartTheme";
+const store = useStore();
+
+const props = defineProps<{
+  tableData: TableDataType[];
+}>();
+
+interface ResultType {
+  x: string;
+  y: number;
+  goals: Record<string, string | number>[];
+}
+
+const seriesData = computed(() => {
+  const result: ResultType[] = [];
+  props.tableData.forEach((user) => {
+    result.push({
+      x: store.showUsernames
+        ? user.username
+          ? user.username
+          : ""
+        : user.name
+          ? user.name
+          : "",
+      y: user.wins,
+      goals: [
+        {
+          name: "Expected",
+          value: user.randomScheduleWins,
+          strokeHeight: 5,
+          strokeColor: "hsl(var(--chart-4))",
+        },
+      ],
+    });
+  });
+  return [{ name: "Actual Wins", data: result }];
+});
+
+const updateChartColor = () => {
+  chartOptions.value = {
+    ...chartOptions.value,
+    chart: {
+      type: "bar",
+      foreColor: getChartTheme().foreground,
+      toolbar: {
+        show: false,
+      },
+      zoom: {
+        enabled: false,
+      },
+    },
+    tooltip: {
+      theme: getChartTooltipTheme(store.darkMode),
+      y: {
+        show: true,
+        formatter: (x: number) => {
+          if (Number.isInteger(x)) {
+            return `${x}`;
+          }
+          return `${x.toFixed(2)}`;
+        },
+      },
+      marker: {
+        show: false,
+      },
+    },
+  };
+};
+
+watch([() => store.darkMode], () => {
+  updateChartColor();
+});
+
+const chartOptions = ref({
+  responsive: mobileCategoricalChartResponsive(),
+  chart: {
+    foreColor: getChartTheme().foreground,
+    type: "bar",
+    toolbar: {
+      show: false,
+    },
+    zoom: {
+      enabled: false,
+    },
+  },
+  plotOptions: {
+    bar: {
+      columnWidth: "75%",
+    },
+  },
+  colors: ["hsl(var(--chart-2))"],
+  dataLabels: {
+    enabled: false,
+  },
+  tooltip: {
+    theme: getChartTooltipTheme(store.darkMode),
+    y: {
+      show: true,
+      formatter: (x: number) => {
+        if (Number.isInteger(x)) {
+          return `${x}`;
+        }
+        return `${x.toFixed(2)}`;
+      },
+    },
+    marker: {
+      show: false,
+    },
+  },
+  xaxis: {
+    tickAmount: seriesData.value[0].data.length - 1,
+    labels: {
+      hideOverlappingLabels: false,
+      formatter: function (str: string) {
+        const n = 17;
+        return str.length > n ? str.slice(0, n - 1) + "..." : str;
+      },
+    },
+    title: {
+      text: "League Manager",
+      offsetY: -10,
+      style: {
+        fontSize: "16px",
+        fontFamily:
+          "ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji",
+        fontWeight: 600,
+      },
+    },
+  },
+  yaxis: {
+    title: {
+      text: "Wins",
+      offsetX: -10,
+      style: {
+        fontSize: "16px",
+        fontFamily:
+          "ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji",
+        fontWeight: 600,
+      },
+    },
+  },
+  legend: {
+    show: true,
+    showForSingleSeries: true,
+    offsetX: 21,
+    customLegendItems: ["Actual", "Expected"],
+    markers: {
+      fillColors: ["hsl(var(--chart-2))", "hsl(var(--chart-4))"],
+    },
+  },
+});
+</script>
+<template>
+  <Card class="w-full p-4 md:p-6">
+    <div class="flex justify-between">
+      <div>
+        <h1 class="pb-2 text-2xl font-semibold tracking-tight">
+          Actual vs Expected Wins
+        </h1>
+      </div>
+    </div>
+    <apexchart
+      width="100%"
+      height="475"
+      :options="chartOptions"
+      :series="seriesData"
+    ></apexchart>
+    <p
+      class="text-xs sm:-mb-4 footer-font text-muted-foreground"
+      :class="props.tableData.length <= 12 ? 'mt-4' : 'mt-6'"
+    >
+      Expected wins are calculated against a uniformly random opponent each
+      week
+    </p>
+  </Card>
+</template>

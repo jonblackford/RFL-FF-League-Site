@@ -1,0 +1,165 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/report-page.ts": {
+      "includeFiles": "dist/index.html",
+      "maxDuration": 10
+    },
+    "api/report-image.ts": {
+      "includeFiles": "server/og-assets/**",
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/about",
+      "destination": "/about/index.html"
+    },
+    {
+      "source": "/changelog",
+      "destination": "/changelog/index.html"
+    },
+    {
+      "source": "/sleeper-league-analyzer",
+      "destination": "/sleeper-league-analyzer/index.html"
+    },
+    {
+      "source": "/espn-league-analyzer",
+      "destination": "/espn-league-analyzer/index.html"
+    },
+    {
+      "source": "/fantasy-football-draft-grades",
+      "destination": "/fantasy-football-draft-grades/index.html"
+    },
+    {
+      "source": "/fantasy-football-manager-profiles-rivalry-report-example",
+      "destination": "/fantasy-football-manager-profiles-rivalry-report-example/index.html"
+    },
+    {
+      "source": "/fantasy-football-playoff-odds-calculator",
+      "destination": "/fantasy-football-playoff-odds-calculator/index.html"
+    },
+    {
+      "source": "/fantasy-football-power-rankings",
+      "destination": "/fantasy-football-power-rankings/index.html"
+    },
+    {
+      "source": "/fantasy-football-league-history",
+      "destination": "/fantasy-football-league-history/index.html"
+    },
+    {
+      "source": "/fantasy-football-weekly-recap",
+      "destination": "/fantasy-football-weekly-recap/index.html"
+    },
+    {
+      "source": "/fantasy-football-weekly-recap-example",
+      "destination": "/fantasy-football-weekly-recap-example/index.html"
+    },
+    {
+      "source": "/fantasy-football-video-recap-example",
+      "destination": "/fantasy-football-video-recap-example/index.html"
+    },
+    {
+      "source": "/report/:token",
+      "destination": "/api/report-page?token=:token"
+    },
+    {
+      "source": "/account",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+        },
+        {
+          "key": "X-Permitted-Cross-Domain-Policies",
+          "value": "none"
+        }
+      ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/((?!assets/|.*\\..*).*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/account",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, follow"
+        }
+      ]
+    },
+    {
+      "source": "/report/:token",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    }
+  ]
+}

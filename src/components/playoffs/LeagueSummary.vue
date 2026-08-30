@@ -1,0 +1,250 @@
+<script setup lang="ts">
+import { TableDataType, UserType } from "../../types/types.ts";
+import { Player } from "../../types/apiTypes.ts";
+import { generateSummary, getPlayersByIdsMap } from "../../api/api.ts";
+import { ref, onMounted, watch, computed } from "vue";
+import { getLeagueKey, useStore } from "../../store/store";
+import Card from "../ui/card/Card.vue";
+import Separator from "../ui/separator/Separator.vue";
+import { toast } from "vue-sonner";
+import { Copy } from "@lucide/vue";
+import { Button } from "../ui/button/index.ts";
+import { renderMarkdown } from "@/lib/markdown";
+
+const store = useStore();
+const props = defineProps<{
+  tableData: TableDataType[];
+  finalPlacements: UserType[];
+}>();
+
+const rawSummary = ref("");
+type PlayoffPromptRow = {
+  playerNames: (string | undefined)[];
+  rosterId: number;
+  points: number[];
+};
+const playoffPromptData = ref<PlayoffPromptRow[]>([]);
+
+const renderedSummary = computed(() => {
+  return renderMarkdown(rawSummary.value);
+});
+
+const showSummary = computed(() => {
+  if (store.leagueInfo.length > 0) {
+    if (
+      store.currentLeague &&
+      store.currentLeague.status === "complete"
+    ) {
+      return true;
+    }
+    return false;
+  }
+  return true;
+});
+
+onMounted(async () => {
+  if (
+    store.leagueInfo.length > 0 &&
+    !store.currentLeague?.yearEndReport
+  ) {
+    await fetchPlayerNames();
+    await getSummary();
+  } else if (store.leagueInfo.length > 0) {
+    const savedText =
+      store.currentLeague.yearEndReport ?? "";
+    rawSummary.value = savedText;
+  }
+});
+
+watch(
+  () => store.currentLeagueId,
+  async () => {
+    if (!store.currentLeague.yearEndReport) {
+      rawSummary.value = "";
+      await fetchPlayerNames();
+      await getSummary();
+    }
+    rawSummary.value =
+      store.currentLeague.yearEndReport ?? "";
+  }
+);
+
+const fetchPlayerNames = async () => {
+  if (store.leagueIds.length > 0) {
+    const currentLeague = store.currentLeague;
+    if (currentLeague) {
+      const allPlayerIds = currentLeague.weeklyPoints
+        .map((user) => user.starters[user.starters.length - 1] ?? [])
+        .flat()
+        .filter((id): id is string => id !== null);
+
+      let playerLookupMap = new Map<string, Player>();
+      if (allPlayerIds.length > 0) {
+        playerLookupMap = await getPlayersByIdsMap(allPlayerIds);
+      }
+
+      const result = currentLeague.weeklyPoints.map((user) => {
+        const starterIds = (
+          user.starters[user.starters.length - 1] ?? []
+        ).filter((id): id is string => id !== null);
+        const starterNames = starterIds.map((id) =>
+          playerLookupMap.get(id)?.name
+            ? playerLookupMap.get(id)?.name
+            : playerLookupMap.get(id)?.team
+        );
+        return {
+          playerNames: starterNames,
+          rosterId: user.rosterId,
+          points: user.points,
+        };
+      });
+
+      playoffPromptData.value = result;
+    }
+  }
+};
+
+const getSummary = async () => {
+  const currentLeague = store.currentLeague;
+  if (currentLeague && props.finalPlacements.length > 0) {
+    const winner = props.finalPlacements.find((val) => val.placement === 1);
+    const lastPlace = props.finalPlacements.find(
+      (val) => val.placement === currentLeague.totalRosters
+    );
+
+    const leagueMetadata = {
+      leagueWinner: store.showUsernames
+        ? (winner?.username ?? "")
+        : (winner?.name ?? ""),
+      lastPlace: store.showUsernames
+        ? (lastPlace?.username ?? "")
+        : (lastPlace?.name ?? ""),
+      playoffTeams: currentLeague.playoffTeams,
+      season: currentLeague.season,
+    };
+
+    const userData = props.tableData.map((user) => {
+      return {
+        name: store.showUsernames ? user.username : user.name,
+        wins: user.wins,
+        losses: user.losses,
+        totalPoints: user.pointsFor,
+        regularSeasonRank: user.regularSeasonRank,
+        finalRank:
+          props.finalPlacements.find((val) => val.name === user.name)
+            ?.placement ?? 0,
+        playOffData: playoffPromptData.value.find(
+          (val) => val.rosterId === user.rosterId
+        ),
+      };
+    });
+    const response = await generateSummary(userData, leagueMetadata);
+    rawSummary.value = response.text;
+    store.addYearEndReport(getLeagueKey(currentLeague), rawSummary.value);
+  }
+};
+const copyReport = () => {
+  const appUrl = window.location.origin;
+  navigator.clipboard.writeText(
+    rawSummary.value + `\n\n Created with ${appUrl}`
+  );
+  toast.success("Summary copied to clipboard!");
+};
+</script>
+<template>
+  <Card v-if="showSummary" class="w-full h-full p-4 mx-auto mt-4 md:p-6">
+    <div class="flex justify-between mb-3">
+      <h5 class="text-2xl font-semibold tracking-tight">League Recap</h5>
+      <Button
+        aria-label="Copy league recap"
+        title="Copy league recap"
+        @click="copyReport()"
+        variant="outline"
+        size="sm"
+        class="h-8"
+      >
+        <Copy class="size-4" />
+      </Button>
+    </div>
+    <Separator class="mt-3 mb-2" />
+    <div v-if="renderedSummary">
+      <div
+        v-html="renderedSummary"
+        class="max-w-5xl my-3 leading-7 text-foreground/90 dark:text-foreground/85 report-content"
+      ></div>
+      <div class="-mb-2">
+        <p class="text-xs text-muted-foreground">
+          AI-generated summary. Information provided may not always be accurate.
+        </p>
+      </div>
+    </div>
+    <!-- Fake data for home page  -->
+    <div v-else-if="store.leagueInfo.length == 0" class="max-w-5xl">
+      <p class="mb-3">
+        <b>Saquondo </b> took the league by storm, riding Jalen Hurts and Kyren
+        Williams to a championship like a cowboy on a rocket-powered steed. With
+        1646 points and a 9-5 record, they left the competition eating dust and
+        their own tears. <b>Baby Back Gibbs</b> tried to keep up, but even Lamar
+        Jackson couldn't sprint past the finish line fast enough, settling for a
+        respectable second place.
+      </p>
+      <p class="mb-3">
+        <b>Breece's Puffs</b> and <b>Ja’Marr the Merrier</b> showed up to the
+        playoffs like they were at a family reunion—happy to be there but not
+        expecting much. Meanwhile, the <b>LaPorta Potty</b> seemed to take their
+        name a bit too seriously, sleepwalking to a sixth-place finish.
+        <b>The Princess McBride</b> dashed in and out of relevance, ending up
+        fifth, while <b>Just the Tua Us</b> and <b>Lamario Kart </b> played the
+        role of lovable underdogs, ultimately barking up the wrong tree.
+      </p>
+      <p class="mb-4">
+        <b>Dak to the Future</b> was as unpredictable as a cat on catnip,
+        finishing in second to last. And then there's <b>Bijan Mustard</b>, who
+        lived up to their name by stinking up the league basement. Joe Flacco as
+        your QB? Bold strategy, Cotton. Let's see how that worked out... oh,
+        right, last place. Better luck next year, folks!
+      </p>
+    </div>
+    <div v-else>
+      <div role="status" class="space-y-2.5 animate-pulse max-w-lg mb-6">
+        <p class="mt-4">Generating Recap...</p>
+        <div class="flex items-center w-full">
+          <div class="h-2.5 bg-muted rounded-full w-32"></div>
+          <div class="h-2.5 ms-2 bg-muted/80 rounded-full w-24"></div>
+          <div class="h-2.5 ms-2 bg-muted/80 rounded-full w-full"></div>
+        </div>
+        <div class="flex items-center w-full max-w-[480px]">
+          <div class="h-2.5 bg-muted rounded-full w-full"></div>
+          <div class="h-2.5 ms-2 bg-muted/80 rounded-full w-full"></div>
+          <div class="h-2.5 ms-2 bg-muted/80 rounded-full w-24"></div>
+        </div>
+        <div class="flex items-center w-full max-w-[400px]">
+          <div class="h-2.5 bg-muted/80 rounded-full w-full"></div>
+          <div class="h-2.5 ms-2 bg-muted rounded-full w-80"></div>
+          <div class="h-2.5 ms-2 bg-muted/80 rounded-full w-full"></div>
+        </div>
+        <div class="flex items-center w-full max-w-[480px]">
+          <div class="h-2.5 ms-2 bg-muted rounded-full w-full"></div>
+          <div class="h-2.5 ms-2 bg-muted/80 rounded-full w-full"></div>
+          <div class="h-2.5 ms-2 bg-muted/80 rounded-full w-24"></div>
+        </div>
+        <div class="flex items-center w-full max-w-[440px]">
+          <div class="h-2.5 ms-2 bg-muted/80 rounded-full w-32"></div>
+          <div class="h-2.5 ms-2 bg-muted/80 rounded-full w-24"></div>
+          <div class="h-2.5 ms-2 bg-muted rounded-full w-full"></div>
+        </div>
+        <div class="flex items-center w-full max-w-[360px]">
+          <div class="h-2.5 ms-2 bg-muted/80 rounded-full w-full"></div>
+          <div class="h-2.5 ms-2 bg-muted rounded-full w-80"></div>
+          <div class="h-2.5 ms-2 bg-muted/80 rounded-full w-full"></div>
+        </div>
+        <span class="sr-only">Loading...</span>
+      </div>
+    </div>
+  </Card>
+</template>
+<style scoped>
+:deep(.report-content p + p) {
+  margin-top: 1rem;
+}
+</style>

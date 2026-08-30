@@ -1,0 +1,466 @@
+import { createApp, defineAsyncComponent, watch } from "vue";
+import { createPinia } from "pinia";
+import { createRouter, createWebHashHistory, createWebHistory } from "vue-router";
+import { registerSW } from "virtual:pwa-register";
+import "./index.css";
+import App from "./App.vue";
+import { useAuthStore } from "./store/auth";
+import { useStore } from "./store/store";
+import { useSubscriptionStore } from "./store/subscription";
+import {
+  flushLeaguePersistence,
+  watchLeaguePersistence,
+} from "./lib/leagueStorage";
+import {
+  identifyUser,
+  initializeAnalytics,
+  resetAnalytics,
+  setUserProperties,
+  trackPageView,
+} from "./lib/analytics";
+
+const Home = () => import("./views/Home.vue");
+const About = () => import("./views/About.vue");
+const ChangelogPage = () => import("./views/Changelog.vue");
+const PrivacyPolicy = () => import("./views/PrivacyPolicy.vue");
+const Terms = () => import("./views/Terms.vue");
+const Account = () => import("./views/Account.vue");
+const SharedReport = () => import("./views/SharedReport.vue");
+const SeoLanding = () => import("./views/SeoLanding.vue");
+const EspnLeagueAnalyzer = () => import("./views/EspnLeagueAnalyzer.vue");
+const DraftGradesLanding = () => import("./views/DraftGradesLanding.vue");
+const DraftRoomExample = () => import("./views/DraftRoomExample.vue");
+const ManagerProfilesRivalryExample = () =>
+  import("./views/ManagerProfilesRivalryExample.vue");
+const PlayoffOddsLanding = () => import("./views/PlayoffOddsLanding.vue");
+const PowerRankingsLanding = () => import("./views/PowerRankingsLanding.vue");
+const LeagueHistoryLanding = () => import("./views/LeagueHistoryLanding.vue");
+const WeeklyRecapLanding = () => import("./views/WeeklyRecapLanding.vue");
+const PlayerValuesLanding = () => import("./views/PlayerValuesLanding.vue");
+const TradeFinderLanding = () => import("./views/TradeFinderLanding.vue");
+const PremiumReportExample = () => import("./views/PremiumReportExample.vue");
+const VideoRecapExample = () => import("./views/VideoRecapExample.vue");
+const NotFound = () => import("./views/404.vue");
+
+const siteUrl = window.location.origin;
+const publicBaseUrl = new URL(import.meta.env.BASE_URL, window.location.href);
+const getPublicAssetUrl = (assetPath: string) =>
+  new URL(assetPath.replace(/^\//, ""), publicBaseUrl).toString();
+const defaultMeta = {
+  title: "RFL Agent | Fantasy Football Team & League Analyzer",
+  description:
+    "Analyze your Sleeper or ESPN fantasy football league with power rankings, roster insights, playoff odds, draft grades, weekly recaps, and more.",
+};
+
+const routes = [
+  {
+    path: "/",
+    component: Home,
+    meta: defaultMeta,
+  },
+  {
+    path: "/sleeper-league-analyzer",
+    component: SeoLanding,
+    meta: {
+      title: "Sleeper Fantasy Football League Analyzer | RFL Agent",
+      description:
+        "Analyze any Sleeper fantasy football league with power rankings, playoff odds, weekly recaps, draft grades, roster insights, and league history.",
+      standalone: true,
+      landingPage: {
+        eyebrow: "Sleeper league tools",
+        heading: "A complete Sleeper fantasy football league analyzer",
+        introduction:
+          "Turn your Sleeper league data into power rankings, playoff odds, draft grades, matchup recaps, manager profiles, and shareable season stories.",
+        benefits: [
+          "Import by league ID or username",
+          "Explore weekly and all-time trends",
+          "Share reports with your league",
+        ],
+        sectionHeading: "Go beyond the Sleeper standings",
+        sections: [
+          {
+            title: "Power rankings and expected wins",
+            body: "Compare records with underlying performance, schedule strength, roster projections, and the wins each manager would expect against the rest of the league.",
+          },
+          {
+            title: "Weekly league recaps",
+            body: "Transform matchup results and player performances into a readable weekly report with awards, trends, previews, and shareable league content.",
+          },
+          {
+            title: "Draft and roster analysis",
+            body: "Review draft grades, roster strengths, transactions, waiver activity, and trades without assembling data by hand.",
+          },
+          {
+            title: "Sleeper dynasty team and roster analysis",
+            body: "Evaluate dynasty rosters with projections, positional strength, player values, trades, manager history, and league context that goes beyond a single-week lineup.",
+          },
+          {
+            title: "League history",
+            body: "Follow seasons across a Sleeper league chain to compare managers, head-to-head records, finishes, scoring records, and long term tendencies.",
+          },
+        ],
+      },
+    },
+  },
+  {
+    path: "/fantasy-football-weekly-recap",
+    component: WeeklyRecapLanding,
+    meta: {
+      title: "Fantasy Football Weekly Recap Generator | RFL Agent",
+      description:
+        "Create fantasy football weekly recaps with matchup stories, league awards, customizable shared reports, and Premium video recaps.",
+      standalone: true,
+    },
+  },
+  {
+    path: "/espn-league-analyzer",
+    component: EspnLeagueAnalyzer,
+    meta: {
+      title: "ESPN Fantasy Football League Analyzer | RFL Agent",
+      description:
+        "Analyze an ESPN fantasy football league with power rankings, expected wins, playoff forecasts, draft results, weekly recaps, and manager trends.",
+      standalone: true,
+    },
+  },
+  {
+    path: "/fantasy-football-draft-grades",
+    component: DraftGradesLanding,
+    meta: {
+      title: "Fantasy Football Draft Grader for Sleeper & ESPN | RFL Agent",
+      description:
+        "Grade your completed Sleeper or ESPN fantasy football draft with pick-by-pick grades, team scores, ADP comparisons, projections, and a full draft recap.",
+      standalone: true,
+    },
+  },
+  {
+    path: "/fantasy-football-draft-room-example",
+    component: DraftRoomExample,
+    meta: {
+      title: "Fantasy Football Draft Room Scouting Example | RFL Agent",
+      description:
+        "Preview a fantasy football positional draft plan with projected room pressure, manager tendencies, and league-history scouting.",
+      standalone: true,
+    },
+  },
+  {
+    path: "/fantasy-football-manager-profiles-rivalry-report-example",
+    component: ManagerProfilesRivalryExample,
+    meta: {
+      title: "Fantasy Football Manager Profiles & Rivalry Reports | RFL Agent",
+      description:
+        "Preview fantasy football manager profiles and rivalry reports built from career records, tendencies, head-to-head history, and league milestones.",
+      standalone: true,
+    },
+  },
+  {
+    path: "/fantasy-football-playoff-odds-calculator",
+    component: PlayoffOddsLanding,
+    meta: {
+      title: "Fantasy Football Playoff Odds Calculator | RFL Agent",
+      description:
+        "Simulate your fantasy football season 5,000 times to estimate playoff odds, projected wins, seed ranges, and schedule scenarios.",
+      standalone: true,
+    },
+  },
+  {
+    path: "/fantasy-football-power-rankings",
+    component: PowerRankingsLanding,
+    meta: {
+      title: "Fantasy Football Power Rankings for Your League | RFL Agent",
+      description:
+        "Create fantasy football power rankings using weekly scoring, consistency, win percentage, ranking history, and positional roster strength.",
+      standalone: true,
+    },
+  },
+  {
+    path: "/fantasy-football-league-history",
+    component: LeagueHistoryLanding,
+    meta: {
+      title: "Fantasy Football League History & All-Time Records | RFL Agent",
+      description:
+        "Build a fantasy football league history with all-time standings, championships, season finishes, scoring records, and head-to-head rivalries.",
+      standalone: true,
+    },
+  },
+  {
+    path: "/fantasy-football-player-values",
+    component: PlayerValuesLanding,
+    meta: {
+      title: "Fantasy Football Player Values for Your League | RFL Agent",
+      description:
+        "Rank fantasy football players with trade values adjusted for your league size, scoring, lineup requirements, and redraft or dynasty format.",
+      standalone: true,
+    },
+  },
+  {
+    path: "/fantasy-football-trade-finder",
+    component: TradeFinderLanding,
+    meta: {
+      title: "Fantasy Football Trade Finder for Your League | RFL Agent",
+      description:
+        "Scan your fantasy football league for balanced trade ideas projected to improve both starting lineups in redraft and dynasty formats.",
+      standalone: true,
+    },
+  },
+  {
+    path: "/fantasy-football-weekly-recap-example",
+    component: PremiumReportExample,
+    meta: {
+      title: "Fantasy Football Weekly Recap Example | RFL Agent",
+      description:
+        "Read a complete Week 11 fantasy football recap example with matchup scores, avatar icons, matchup analysis, Team of the Week, and weekly lowlights.",
+      ogType: "article",
+      standalone: true,
+    },
+  },
+  {
+    path: "/fantasy-football-video-recap-example",
+    component: VideoRecapExample,
+    meta: {
+      title: "Fantasy Football Video Recap Example | RFL Agent",
+      description:
+        "Watch a 40-second fantasy football video recap example with league storylines, matchup scores, and team-by-team results.",
+      image: `${siteUrl}/video/ffwrapped-video-recap-poster-week-11-v2.jpg`,
+      standalone: true,
+    },
+  },
+  {
+    path: "/about",
+    component: About,
+    meta: {
+      title: "About | RFL Agent",
+      description:
+        "Learn about RFL Agent, a tool for analyzing fantasy football leagues.",
+    },
+  },
+  {
+    path: "/changelog",
+    component: ChangelogPage,
+    meta: {
+      title: "Changelog | RFL Agent",
+      description: "See the latest RFL Agent updates, features, and bug fixes",
+    },
+  },
+  {
+    path: "/privacy",
+    component: PrivacyPolicy,
+    meta: {
+      title: "Privacy Policy | RFL Agent",
+      description:
+        "Read the RFL Agent privacy policy and learn how league, account, billing, and generated media data are handled.",
+    },
+  },
+  {
+    path: "/terms",
+    component: Terms,
+    meta: {
+      title: "Terms of Service | RFL Agent",
+      description:
+        "Read the RFL Agent terms of service for league analysis, generated reports, sharing, and video recaps.",
+    },
+  },
+  {
+    path: "/account",
+    component: Account,
+    meta: {
+      title: "Account | RFL Agent",
+      description: "Manage your RFL Agent account and subscription settings.",
+      robots: "noindex, follow",
+    },
+  },
+  {
+    path: "/report/:token",
+    component: SharedReport,
+    meta: {
+      title: "Shared Weekly Report | RFL Agent",
+      description: "View a shared RFL Agent premium weekly report.",
+      robots: "noindex, nofollow",
+      standalone: true,
+    },
+  },
+  {
+    path: "/:pathMatch(.*)*",
+    name: "NotFound",
+    component: NotFound,
+    meta: {
+      title: "Page Not Found | RFL Agent",
+      description:
+        "The page you are looking for could not be found on RFL Agent.",
+      robots: "noindex, follow",
+    },
+  },
+];
+
+const router = createRouter({
+  history:
+    import.meta.env.VITE_GITHUB_PAGES === "true"
+      ? createWebHashHistory(import.meta.env.BASE_URL)
+      : createWebHistory(import.meta.env.BASE_URL),
+  routes,
+  scrollBehavior() {
+    return { top: 0 };
+  },
+});
+
+const staleChunkReloadKey = "stale-chunk-reload-attempted";
+const isDynamicImportError = (reason: unknown) => {
+  const message = reason instanceof Error ? reason.message : String(reason);
+
+  return (
+    message.includes("Failed to fetch dynamically imported module") ||
+    message.includes("Importing a module script failed") ||
+    message.includes("error loading dynamically imported module")
+  );
+};
+
+window.addEventListener("unhandledrejection", (event) => {
+  if (!isDynamicImportError(event.reason)) {
+    return;
+  }
+
+  if (sessionStorage.getItem(staleChunkReloadKey)) {
+    return;
+  }
+
+  sessionStorage.setItem(staleChunkReloadKey, "true");
+  window.location.reload();
+});
+
+router.afterEach(() => {
+  sessionStorage.removeItem(staleChunkReloadKey);
+});
+
+const pinia = createPinia();
+const app = createApp(App);
+
+const ApexChart = defineAsyncComponent(async () => {
+  await Promise.all([
+    import("apexcharts/line"),
+    import("apexcharts/area"),
+    import("apexcharts/bar"),
+    import("apexcharts/pie"),
+    import("apexcharts/heatmap"),
+    import("apexcharts/features/legend"),
+  ]);
+  return import("vue3-apexcharts/core");
+});
+
+app.use(pinia);
+const store = useStore(pinia);
+watchLeaguePersistence(store);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    void flushLeaguePersistence();
+  }
+});
+window.addEventListener("pagehide", () => void flushLeaguePersistence());
+const authStore = useAuthStore(pinia);
+authStore.initialize();
+const subscriptionStore = useSubscriptionStore(pinia);
+subscriptionStore.initialize();
+
+router.beforeEach(async (to) => {
+  if (!authStore.initialized) {
+    await authStore.initialize();
+  }
+  if (to.path === "/account" && to.query.code && authStore.isAuthenticated) {
+    const { code: _authCode, ...query } = to.query;
+    return {
+      path: to.path,
+      query,
+      hash: to.hash,
+      replace: true,
+    };
+  }
+  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    return { path: "/" };
+  }
+  return true;
+});
+
+router.afterEach((to) => {
+  const title = String(to.meta.title ?? defaultMeta.title);
+  const description = String(to.meta.description ?? defaultMeta.description);
+  const robots = String(to.meta.robots ?? "index, follow");
+  const ogType = String(to.meta.ogType ?? "website");
+  const canonicalUrl = `${siteUrl}${to.path === "/" ? "/" : to.path}`;
+  const imageUrl = String(to.meta.image ?? getPublicAssetUrl("logo.webp"));
+
+  document.title = title;
+
+  const setMetaContent = (selector: string, content: string) => {
+    document.querySelector(selector)?.setAttribute("content", content);
+  };
+
+  setMetaContent('meta[name="description"]', description);
+  setMetaContent('meta[itemprop="name"]', title);
+  setMetaContent('meta[itemprop="description"]', description);
+  setMetaContent('meta[property="og:title"]', title);
+  setMetaContent('meta[property="og:description"]', description);
+  setMetaContent('meta[property="og:url"]', canonicalUrl);
+  setMetaContent('meta[property="og:type"]', ogType);
+  setMetaContent('meta[property="og:image"]', imageUrl);
+  setMetaContent('meta[itemprop="image"]', imageUrl);
+  setMetaContent('meta[name="twitter:title"]', title);
+  setMetaContent('meta[name="twitter:description"]', description);
+  setMetaContent('meta[name="twitter:image"]', imageUrl);
+
+  let robotsMeta = document.querySelector<HTMLMetaElement>(
+    'meta[name="robots"]'
+  );
+  if (!robotsMeta) {
+    robotsMeta = document.createElement("meta");
+    robotsMeta.name = "robots";
+    document.head.appendChild(robotsMeta);
+  }
+  robotsMeta.content = robots;
+
+  document
+    .querySelector('link[rel="canonical"]')
+    ?.setAttribute("href", canonicalUrl);
+
+  trackPageView(to.fullPath, title);
+});
+
+watch(
+  () => ({ initialized: authStore.initialized, user: authStore.user }),
+  ({ initialized, user }) => {
+    if (!initialized) return;
+    if (!user) {
+      resetAnalytics();
+      return;
+    }
+
+    identifyUser(user.id, {
+      email: user.email ?? "",
+      created_at: user.created_at,
+    });
+  },
+  { immediate: true }
+);
+
+watch(
+  () => [
+    authStore.isAuthenticated,
+    subscriptionStore.isPremium,
+    subscriptionStore.status,
+    subscriptionStore.planType,
+  ],
+  ([isAuthenticated, isPremium, status, planType]) => {
+    if (!isAuthenticated) return;
+
+    setUserProperties({
+      is_premium: Boolean(isPremium),
+      subscription_status: String(status),
+      plan_type: String(planType ?? "none"),
+    });
+  },
+  { immediate: true }
+);
+
+app.component("apexchart", ApexChart);
+app.use(router);
+registerSW({ immediate: true });
+app.mount("#app");
+document.documentElement.classList.remove("prerender-pending");
+initializeAnalytics();
