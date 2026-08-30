@@ -4,7 +4,11 @@ export const leagueFeatures = [
   { id: "Power Rankings" },
   { id: "Expected Wins" },
   { id: "Roster Management" },
-  { id: "Weekly Report", unavailableForGuillotine: true },
+  {
+    id: "Weekly Report",
+    unavailableForGuillotine: true,
+    hiddenFromNavigation: true,
+  },
   { id: "Playoffs" },
   { id: "Player Values" },
   { id: "Trade Lab" },
@@ -66,9 +70,13 @@ const leagueFeatureIds = new Set<string>(
 export const isLeagueFeature = (value: string): value is LeagueFeature =>
   leagueFeatureIds.has(value);
 
+export const isSidebarLeagueFeature = (value: LeagueFeature) =>
+  sidebarLeagueFeatures.some(({ id }) => id === value);
+
 export const normalizeLeagueFeature = (value: string): LeagueFeature => {
   if (value === "Schedule Simulator") return "Season Forecast";
-  return isLeagueFeature(value) ? value : "Standings";
+  if (!isLeagueFeature(value)) return "Standings";
+  return isSidebarLeagueFeature(value) ? value : "Standings";
 };
 
 export const sidebarLeagueFeatures = leagueFeatures.filter(

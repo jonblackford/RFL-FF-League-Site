@@ -46,10 +46,6 @@ import {
   loadDemoStartSit,
   type DemoLeagueFixtures,
 } from "@/data/demo/loaders";
-import {
-  getLeagueAnalyticsProperties,
-  trackPremiumJourneyStep,
-} from "@/lib/analytics";
 
 type StartSitPlayer = {
   name?: string;
@@ -256,15 +252,6 @@ const lineupSummaryMetrics = computed(() => {
     },
   ];
 });
-
-const trackValuesUpgradeClick = () => {
-  trackPremiumJourneyStep("premium_cta_clicked", {
-    feature: "start_sit",
-    cta: "add_player_value_context",
-    source: "start_sit_lineup_check",
-    ...getLeagueAnalyticsProperties(store.currentLeague),
-  });
-};
 
 const rosterNews = computed(() =>
   buildRosterNews(
@@ -790,7 +777,7 @@ watch(
                     variant="outline"
                     class="w-fit shrink-0"
                   >
-                    Premium context applied
+                    Value context applied
                   </Badge>
                 </div>
                 <div
@@ -811,35 +798,14 @@ watch(
                 </div>
                 <p class="mt-3 text-xs leading-5 text-muted-foreground">
                   <template v-if="hasCurrentRosterValues">
-                    Weekly calls combine projections, recent form, and Premium's
-                    league adjusted player values.
+                    Weekly calls combine projections, recent form, and
+                    league-adjusted player values.
                   </template>
                   <template v-else>
                     Start/sit recommendations use weekly projections and recent
-                    performance. Premium adds league adjusted player values for
-                    additional context.
+                    performance.
                   </template>
                 </p>
-                <Button
-                  v-if="valueAccess === 'preview' && !valuesLoading"
-                  as-child
-                  size="sm"
-                  class="mt-3"
-                >
-                  <router-link
-                    :to="{
-                      path: '/account',
-                      query: {
-                        ...$route.query,
-                        intent: 'player_values',
-                        upgrade_source: 'start_sit_lineup_check',
-                      },
-                    }"
-                    @click="trackValuesUpgradeClick"
-                  >
-                    Unlock Premium context
-                  </router-link>
-                </Button>
               </section>
             </aside>
             <div class="w-full min-w-0 xl:col-start-1 xl:row-start-1">

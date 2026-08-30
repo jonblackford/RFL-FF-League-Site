@@ -1,19 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import DraftRoomSample from "@/components/league_narratives/DraftRoomSample.vue";
 import type { ManagerArchetype } from "@/lib/narratives";
-import {
-  getLeagueAnalyticsProperties,
-  trackPremiumJourneyStep,
-} from "@/lib/analytics";
-import { useStore } from "@/store/store";
-import { usePaywallViewTracking } from "@/composables/usePaywallViewTracking";
 
-const store = useStore();
-const paywallElement = ref<HTMLElement | null>(null);
 const auctionRoomBenchmarks = [
   { position: "RB", amount: 78, share: 39 },
   { position: "WR", amount: 70, share: 35 },
@@ -136,32 +127,6 @@ const historyHeading = computed(
     `Scout how your league actually ${props.isAuction ? "bids" : "drafts"}`
 );
 
-const unlockLabel = computed(() =>
-  props.isAuction
-    ? "Unlock Auction Draft Room"
-    : "Unlock Draft Room Scouting"
-);
-
-const analyticsProperties = () => ({
-  feature: "draft_room",
-  source: "draft_room_locked_preview",
-  preview_type: "personalized_history",
-  manager_count: historySummary.value.managers,
-  tracked_drafts: historySummary.value.drafts,
-  ...getLeagueAnalyticsProperties(store.currentLeague),
-});
-
-usePaywallViewTracking(paywallElement, () => {
-  trackPremiumJourneyStep("paywall_viewed", analyticsProperties());
-});
-
-const trackUnlockClick = () => {
-  trackPremiumJourneyStep("premium_cta_clicked", {
-    ...analyticsProperties(),
-    cta: "unlock_draft_room_scouting",
-  });
-  store.currentTab = "";
-};
 </script>
 
 <template>
@@ -345,31 +310,13 @@ const trackUnlockClick = () => {
     </div>
     <DraftRoomSample v-else />
 
-    <div
-      ref="paywallElement"
-      class="flex flex-col gap-4 p-4 mt-4 border rounded-card bg-muted/30 sm:flex-row sm:items-center sm:justify-between sm:p-5"
-    >
+    <div class="p-4 mt-4 border rounded-card bg-muted/30 sm:p-5">
       <div v-if="historySummary.managers" class="max-w-2xl">
         <p class="font-semibold">{{ historyHeading }}</p>
         <p class="mt-1 text-sm leading-relaxed text-muted-foreground">
           {{ previewCopy.description }}
         </p>
       </div>
-      <Button as-child class="shrink-0" size="lg">
-        <router-link
-          :to="{
-            path: '/account',
-            query: {
-              ...$route.query,
-              intent: 'draft_room',
-              upgrade_source: 'draft_room_locked_preview',
-            },
-          }"
-          @click="trackUnlockClick"
-        >
-          {{ unlockLabel }}
-        </router-link>
-      </Button>
     </div>
   </div>
 </template>

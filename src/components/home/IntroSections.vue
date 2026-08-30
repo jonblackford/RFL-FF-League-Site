@@ -284,42 +284,16 @@ const toolSummaries: ToolSummary[] = [
               {{ tool.description }}
             </p>
           </div>
-          <div class="premium-cell">
+          <div class="feature-cell">
             <div class="max-w-3xl">
               <h3 class="mt-2 text-2xl font-semibold">
-                Premium features for leagues that want more
+                League features for members who want more
               </h3>
               <p class="mt-4 text-sm leading-6 text-muted-foreground">
-                Optional
-                <router-link
-                  :to="{
-                    path: '/account',
-                    query: $route.query,
-                    state: { scrollToPricing: true },
-                  }"
-                  class="font-medium text-primary hover:underline"
-                >
-                  Premium
-                </router-link>
-                features turn every week into a shareable
-                <a
-                  href="/report/1BJ_ktCJQl1Ocjwy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="font-medium text-primary hover:underline"
-                  >league newsletter</a
-                >
-                and
-                <RouterLink
-                  to="/fantasy-football-video-recap-example"
-                  class="font-medium text-primary hover:underline"
-                >
-                  video recap</RouterLink
-                >. They also use your league's history to create manager
-                profiles, draft scouting plans, and rivalry reports, while
-                unlocking complete Player Values and Trade Finder. Everything
-                else from the past three seasons, plus plenty more, remains
-                free.
+                Use your league's history, scoring settings, matchups, and
+                roster data to review manager profiles, player values, trade
+                options, start/sit calls, and season trends without account
+                upgrade prompts.
               </p>
             </div>
           </div>
@@ -380,7 +354,7 @@ const toolSummaries: ToolSummary[] = [
   border-bottom: 1px solid hsl(var(--border) / 0.8);
 }
 
-.premium-cell {
+.feature-cell {
   grid-column: 1 / -1;
   padding: 2rem;
 }

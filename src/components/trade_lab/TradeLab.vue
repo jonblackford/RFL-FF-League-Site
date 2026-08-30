@@ -1365,7 +1365,7 @@ onBeforeUnmount(() => {
         class="pt-3 mt-4 text-xs border-t border-border text-muted-foreground"
       >
         <template v-if="dynasty && playerValueAccess !== 'premium'">
-          Dynasty ADP is a raw Sleeper market baseline. Premium adds POS/OVR
+          Dynasty ADP is a raw Sleeper market baseline. Local values also use
           rankings adjusted for your league's scoring and roster format.
         </template>
         <template v-else-if="dynasty">
@@ -1373,8 +1373,8 @@ onBeforeUnmount(() => {
           league's scoring and roster format.
         </template>
         <template v-else>
-          POS/OVR badges use standard Sleeper season rankings. Premium adds
-          rankings adjusted for your league's scoring and roster format.
+          POS/OVR badges use standard Sleeper season rankings, with local values
+          adjusted for your league's scoring and roster format when available.
         </template>
       </div>
     </div>

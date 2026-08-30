@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { getLeagueKey, useStore } from "../../store/store";
+import { useStore } from "../../store/store";
 import Card from "../ui/card/Card.vue";
 import {
   Select,
@@ -11,24 +11,11 @@ import {
 } from "../ui/select";
 import { handleImageFallback as handleImageError } from "@/lib/imageFallback";
 import type { ManagerArchetype } from "@/lib/narratives";
-import {
-  generateManagerComparison,
-  type ManagerComparisonPayload,
-} from "@/api/api";
-import { Button } from "@/components/ui/button";
-import { useSubscriptionStore } from "@/store/subscription";
-import { trackPremiumJourneyStep } from "@/lib/analytics";
-import { renderMarkdown } from "@/lib/markdown";
 import { getChartTheme, getChartTooltipTheme } from "@/lib/chartTheme";
-import { getRivalryReportPairKey } from "@/lib/rivalryReport";
 
 const store = useStore();
-const subscriptionStore = useSubscriptionStore();
 const manager1 = ref("");
 const manager2 = ref("");
-const isGeneratingReport = ref(false);
-const generatedReport = ref("");
-const generationError = ref("");
 type PointSeasonEntry = {
   season: string;
   points: number[];
@@ -191,176 +178,7 @@ const manager2Champs = computed(() => {
   );
 });
 
-const getDisplayName = (manager: ComparisonManager) =>
-  store.showUsernames ? manager.username : manager.name;
-
-const getChampionships = (manager: ComparisonManager) =>
-  manager.leagueWinner.filter(
-    (item: number | null) => item === manager.rosterId
-  ).length;
-
-const getPointsPerGame = (manager: ComparisonManager) =>
-  manager.wins + manager.losses > 0
-    ? manager.points / (manager.wins + manager.losses)
-    : 0;
-
 const formatPoints = (points: number) => String(Number(points.toFixed(2)));
-
-const getAverageEfficiency = (manager: ComparisonManager) =>
-  manager.seasons.length > 0
-    ? manager.managerEfficiency / manager.seasons.length
-    : 0;
-
-const getManagerArchetype = (manager: ComparisonManager) =>
-  props.managerArchetypes?.find(
-    (archetype) =>
-      archetype.userId === manager.id ||
-      archetype.displayName.trim() === manager.name.trim() ||
-      archetype.displayName.trim() === manager.username.trim()
-  );
-
-const manager1Archetype = computed(() =>
-  getManagerArchetype(currentManager1.value)
-);
-
-const manager2Archetype = computed(() =>
-  getManagerArchetype(currentManager2.value)
-);
-
-const getManagerPayload = (
-  manager: ComparisonManager,
-  archetype?: ManagerArchetype
-) => ({
-  displayName: getDisplayName(manager),
-  seasons: manager.seasons,
-  championships: getChampionships(manager),
-  record: {
-    wins: manager.wins,
-    losses: manager.losses,
-  },
-  scoring: {
-    totalPoints: Number(manager.points.toFixed(2)),
-    pointsPerGame: Number(getPointsPerGame(manager).toFixed(2)),
-    recentScoresBySeason: manager.pointSeason,
-  },
-  lineupEfficiency: {
-    averageManagerEfficiency: Number(getAverageEfficiency(manager).toFixed(4)),
-  },
-  managementStyle: {
-    totalTrades: archetype?.totalTrades ?? null,
-    tradeValueGained: archetype?.tradeValueGained ?? null,
-    totalWaivers: archetype?.totalWaivers ?? null,
-    averageDraftPickRank: archetype?.averageDraftPickRank ?? null,
-    playoffAppearances: archetype?.playoffAppearances ?? null,
-    weeklyScoreStdDev: archetype?.weeklyScoreStdDev ?? null,
-  },
-});
-
-const currentLeagueId = computed(
-  () => store.currentLeague?.leagueId ?? store.currentLeagueId
-);
-
-const currentLeagueKey = computed(() =>
-  store.currentLeague
-    ? getLeagueKey(store.currentLeague)
-    : store.currentLeagueId
-);
-
-const rivalryReportPairKey = computed(() => {
-  const managerOneId = currentManager1.value.id;
-  const managerTwoId = currentManager2.value.id;
-  if (!managerOneId || !managerTwoId) return null;
-
-  return getRivalryReportPairKey([managerOneId, managerTwoId]);
-});
-
-const rivalryReportSelectionKey = computed(() => {
-  const leagueKey = currentLeagueKey.value;
-  const pairKey = rivalryReportPairKey.value;
-  if (!leagueKey || !pairKey) return null;
-
-  return `${encodeURIComponent(leagueKey)}:${pairKey}`;
-});
-
-const isSavedRivalryReport = (value: unknown): value is string =>
-  typeof value === "string" && value.trim().length > 0;
-
-const loadSavedRivalryReport = () => {
-  const pairKey = rivalryReportPairKey.value;
-  generatedReport.value = "";
-  generationError.value = "";
-  if (!pairKey) return;
-
-  const savedReport = store.currentLeague?.rivalryReports?.[pairKey];
-  generatedReport.value = isSavedRivalryReport(savedReport) ? savedReport : "";
-};
-
-const aiComparisonPayload = computed<ManagerComparisonPayload>(() => ({
-  managers: [
-    getManagerPayload(currentManager1.value, manager1Archetype.value),
-    getManagerPayload(currentManager2.value, manager2Archetype.value),
-  ],
-  headToHead: {
-    [getDisplayName(currentManager1.value)]: matchupRecord.value,
-    [getDisplayName(currentManager2.value)]: matchupRecord2.value,
-  },
-}));
-
-const lockedReportPreview = computed(() => {
-  const managerOne = getDisplayName(currentManager1.value) || "Manager A";
-  const managerTwo = getDisplayName(currentManager2.value) || "Manager B";
-
-  return `**${managerOne}** and **${managerTwo}** have the kind of rivalry that makes the standings feel personal. One manager owns the cleaner long term resume, but the other keeps hanging around with enough weekly spike scores and matchup weirdness to make every head-to-head feel unstable. The real story is not just who has more wins. It is whether consistency, roster aggression, and late-season timing have actually translated into bragging rights when these two are staring at each other across the schedule.`;
-});
-
-const visibleReport = computed(() =>
-  subscriptionStore.isPremium
-    ? generatedReport.value
-    : lockedReportPreview.value
-);
-
-const renderedReport = computed(() => renderMarkdown(visibleReport.value));
-
-const generateAiReport = async () => {
-  if (!subscriptionStore.isPremium || generatedReport.value) {
-    return;
-  }
-
-  if (!currentLeagueId.value) {
-    generationError.value = "League ID is required to generate a report.";
-    return;
-  }
-
-  if (!import.meta.env.VITE_MANAGER_COMPARISON) {
-    generationError.value = "Missing VITE_MANAGER_COMPARISON configuration.";
-    return;
-  }
-
-  try {
-    isGeneratingReport.value = true;
-    generationError.value = "";
-    const leagueKey = currentLeagueKey.value;
-    const pairKey = rivalryReportPairKey.value;
-    const selectionKey = rivalryReportSelectionKey.value;
-    const result = await generateManagerComparison(
-      currentLeagueId.value,
-      aiComparisonPayload.value
-    );
-    if (leagueKey && pairKey && isSavedRivalryReport(result.text)) {
-      store.addRivalryReport(leagueKey, pairKey, result.text);
-    }
-    if (selectionKey === rivalryReportSelectionKey.value) {
-      generatedReport.value = result.text;
-    }
-  } catch (error) {
-    generationError.value =
-      error instanceof Error
-        ? error.message
-        : "Unable to generate manager comparison.";
-  } finally {
-    isGeneratingReport.value = false;
-  }
-};
 
 const seriesData = computed(() => {
   return [
@@ -396,14 +214,6 @@ watch(
       manager1.value = newManagers[0];
       manager2.value = newManagers[1];
     }
-  },
-  { immediate: true }
-);
-
-watch(
-  rivalryReportSelectionKey,
-  () => {
-    loadSavedRivalryReport();
   },
   { immediate: true }
 );
@@ -897,87 +707,6 @@ const chartOptions = ref({
           </tr>
         </tbody>
       </table>
-    </div>
-    <div class="p-4 mt-4 border-b sm:p-6">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p class="text-xl font-semibold tracking-tight">Rivalry Report</p>
-        </div>
-        <Button
-          v-if="subscriptionStore.isPremium"
-          :disabled="isGeneratingReport || Boolean(generatedReport)"
-          @click="generateAiReport"
-        >
-          {{
-            isGeneratingReport
-              ? "Generating..."
-              : generatedReport
-                ? "Report generated"
-                : "Generate report"
-          }}
-        </Button>
-      </div>
-      <div v-if="subscriptionStore.isPremium">
-        <p v-if="generationError" class="mt-3 text-sm text-destructive">
-          {{ generationError }}
-        </p>
-        <div
-          v-if="generatedReport"
-          v-html="renderedReport"
-          class="rivalry-report mt-4 max-w-[86ch] text-base leading-7 text-foreground/90 dark:text-foreground/85"
-        ></div>
-        <p
-          v-else-if="!generationError"
-          class="mt-3 max-w-[60ch] leading-7 text-muted-foreground"
-        >
-          Generate a comparison using the selected managers' performance
-          throughout every season.
-        </p>
-      </div>
-      <div v-else class="mt-3 max-w-[86ch]">
-        <p
-          class="mb-4 max-w-[60ch] text-sm leading-6 text-muted-foreground sm:text-base"
-        >
-          Premium rivalry reports turn the manager comparison into a
-          personalized short story about the selected managers' history, style,
-          and bragging rights.
-        </p>
-        <div
-          class="relative p-4 mt-3 overflow-hidden border max-h-48 rounded-card sm:p-5"
-        >
-          <div
-            v-html="renderedReport"
-            class="text-base leading-7 rivalry-report text-foreground/90 dark:text-foreground/85"
-          ></div>
-          <div
-            class="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-background via-background/95 to-transparent"
-          ></div>
-          <div class="absolute inset-x-0 z-10 flex justify-center bottom-5">
-            <Button class="mt-4" as-child>
-              <router-link
-                :to="{
-                  path: '/account',
-                  query: {
-                    ...$route.query,
-                    intent: 'rivalry_report',
-                    upgrade_source: 'manager_comparison',
-                  },
-                }"
-                @click="
-                  trackPremiumJourneyStep('premium_cta_clicked', {
-                    cta: 'unlock_rivalry_reports',
-                    feature: 'rivalry_report',
-                    source: 'manager_comparison',
-                  });
-                  store.currentTab = '';
-                "
-              >
-                Unlock Rivalry Reports
-              </router-link>
-            </Button>
-          </div>
-        </div>
-      </div>
     </div>
     <p class="mt-4 mb-8 ml-3 text-lg font-semibold sm:ml-6 sm:mb-0">
       Recent Performances
