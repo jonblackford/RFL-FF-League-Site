@@ -201,22 +201,69 @@ describe("API fallback behavior", () => {
     });
   });
 
-  test("generateTrends rejects on server errors so callers can show a fallback", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockFetchResponse(500, {})));
+  test("generateTrends returns local league news when the endpoint is not configured", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      generateTrends([], 120, 5, "post_season")
-    ).rejects.toThrow("Trends generation request failed with status 500");
+    const result = await generateTrends(
+      [
+        {
+          league: { scoringFormat: 1 },
+          stories: {
+            standings: { leader: { name: "Alpha", record: "5-1" } },
+          },
+        },
+      ],
+      120,
+      3,
+      "post_season"
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.bulletPoints.join(" ")).toContain("Alpha");
   });
 
-  test("generateTrends rejects malformed successful responses", async () => {
+  test("generateTrends falls back to local league news on server errors", async () => {
+    vi.stubEnv("VITE_TRENDS_RECAP", "https://backend.example/trends");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockFetchResponse(500, {})));
+
+    const result = await generateTrends(
+      [
+        {
+          league: { scoringFormat: 0.5 },
+          stories: {
+            weeklyHighlights: { highestScore: { name: "Bravo", score: 140 } },
+          },
+        },
+      ],
+      120,
+      3,
+      "post_season"
+    );
+
+    expect(result.bulletPoints.join(" ")).toContain("Bravo");
+  });
+
+  test("generateTrends falls back to local news on malformed successful responses", async () => {
+    vi.stubEnv("VITE_TRENDS_RECAP", "https://backend.example/trends");
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(mockFetchResponse(200, {}))
     );
 
-    await expect(generateTrends([], 120, 5)).rejects.toThrow(
-      "Trends generation returned an invalid response"
+    const result = await generateTrends(
+      [
+        {
+          league: { scoringFormat: 1 },
+          stories: {
+            standings: { leader: { name: "Alpha", record: "5-1" } },
+          },
+        },
+      ],
+      120,
+      5
     );
+
+    expect(result.bulletPoints.join(" ")).toContain("Alpha");
   });
 });

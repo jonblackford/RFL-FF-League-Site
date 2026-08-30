@@ -1,4 +1,5 @@
 import { assertOk, parseJson } from "@/lib/http";
+import { generateLocalLeagueNews } from "@/lib/localLeagueNews";
 import { normalizePremiumReport } from "@/lib/premiumReport";
 import type { PremiumReport } from "@/types/types";
 import { fetchAiReport } from "./aiRequest";
@@ -9,32 +10,44 @@ export const generateTrends = async (
   bulletCount: number,
   leagueState: string = "in_season"
 ): Promise<{ bulletPoints: string[] }> => {
-  const response = await fetchAiReport(import.meta.env.VITE_TRENDS_RECAP, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      data,
-      wordLimit,
-      bulletCount,
-      leagueState,
-    }),
-  });
-  assertOk(response, "Trends generation request");
-
-  const result = await parseJson<unknown>(response, "Trends generation");
-  if (
-    typeof result !== "object" ||
-    result === null ||
-    !("bulletPoints" in result) ||
-    !Array.isArray(result.bulletPoints) ||
-    !result.bulletPoints.every((bulletPoint) => typeof bulletPoint === "string")
-  ) {
-    throw new Error("Trends generation returned an invalid response");
+  const endpoint = import.meta.env.VITE_TRENDS_RECAP;
+  if (!endpoint) {
+    return generateLocalLeagueNews(data, wordLimit, bulletCount, leagueState);
   }
 
-  return { bulletPoints: result.bulletPoints };
+  try {
+    const response = await fetchAiReport(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        data,
+        wordLimit,
+        bulletCount,
+        leagueState,
+      }),
+    });
+    assertOk(response, "Trends generation request");
+
+    const result = await parseJson<unknown>(response, "Trends generation");
+    if (
+      typeof result !== "object" ||
+      result === null ||
+      !("bulletPoints" in result) ||
+      !Array.isArray(result.bulletPoints) ||
+      !result.bulletPoints.every(
+        (bulletPoint) => typeof bulletPoint === "string"
+      )
+    ) {
+      throw new Error("Trends generation returned an invalid response");
+    }
+
+    return { bulletPoints: result.bulletPoints };
+  } catch (error) {
+    console.warn("Unable to generate remote league news:", error);
+    return generateLocalLeagueNews(data, wordLimit, bulletCount, leagueState);
+  }
 };
 
 export const generateSummary = async (

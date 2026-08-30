@@ -7,6 +7,10 @@ import { DraftPick, Player } from "../../types/apiTypes";
 import { getLeagueKey, useStore } from "../../store/store";
 import { Card, CardTitle, CardHeader } from "../ui/card";
 import { loadDemoCurrentTrends } from "@/data/demo/loaders";
+import {
+  getHistoricalTableData,
+  hasLeagueSeasonData,
+} from "@/lib/leagueHistory";
 import { isSuperflexLeague } from "@/lib/lineup";
 
 const store = useStore();
@@ -162,6 +166,8 @@ const getPreseasonData = async () => {
           totalTeams: currentLeague.rosters.length,
           season: currentLeague.season,
           scoringFormat: currentLeague.scoringType,
+          scoringSettings: currentLeague.scoringSettings ?? {},
+          scoringLabel: getScoringLabel(currentLeague.scoringType),
           seasonType: currentLeague.seasonType,
           rosterPositions: currentLeague.rosterPositions,
           draftRoundsIncluded: 3,
@@ -218,6 +224,13 @@ const getMaxIndex = (arr: number[]): number => {
 const roundToOneDecimal = (value: number): number =>
   Math.round(value * 10) / 10;
 
+const getScoringLabel = (scoringType: number): string => {
+  if (scoringType === 1) return "PPR";
+  if (scoringType === 0.5) return "Half PPR";
+  if (scoringType === 0) return "Standard";
+  return "Custom";
+};
+
 const getAverage = (values: number[]): number => {
   if (values.length === 0) {
     return 0;
@@ -255,6 +268,42 @@ const getTeamRef = (
   name: getTeamName(user),
   ...extra,
 });
+
+const getPreviousSeasonScoringSummary = (currentLeague: LeagueInfoType) => {
+  const previousLeague = (currentLeague.previousLeagues ?? []).find(
+    (league) => league?.leagueId && league?.season
+  );
+
+  if (!previousLeague) return null;
+
+  const previousTableData = getHistoricalTableData(previousLeague);
+  if (!hasLeagueSeasonData(previousLeague, previousTableData)) return null;
+
+  const teamsByPoints = [...previousTableData].sort(
+    (a, b) => b.pointsFor - a.pointsFor
+  );
+  const topScoringTeam = teamsByPoints[0];
+  const scoredTeams = previousTableData.filter((team) => team.pointsFor > 0);
+  const averagePointsFor =
+    scoredTeams.length > 0
+      ? roundToOneDecimal(
+          scoredTeams.reduce((sum, team) => sum + team.pointsFor, 0) /
+            scoredTeams.length
+        )
+      : 0;
+
+  return {
+    season: previousLeague.season,
+    scoringFormat: previousLeague.scoringType,
+    scoringLabel: getScoringLabel(previousLeague.scoringType),
+    topScoringTeam: topScoringTeam
+      ? getTeamRef(topScoringTeam, {
+          pointsFor: roundToOneDecimal(topScoringTeam.pointsFor),
+        })
+      : null,
+    averagePointsFor,
+  };
+};
 
 const getStandingsRef = (
   user: TableDataType,
@@ -374,9 +423,12 @@ const buildLeagueNewsPayload = (
         playoffTeams: currentLeague.playoffTeams,
         totalTeams: props.tableData.length,
         scoringFormat: currentLeague.scoringType,
+        scoringSettings: currentLeague.scoringSettings ?? {},
+        scoringLabel: getScoringLabel(currentLeague.scoringType),
         seasonType: currentLeague.seasonType,
         medianScoring: currentLeague.medianScoring === 1,
       },
+      previousSeason: getPreviousSeasonScoringSummary(currentLeague),
       stories: {
         standings: {
           leader: teamsByRank[0]

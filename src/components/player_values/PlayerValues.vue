@@ -182,6 +182,7 @@ onMounted(fetchPlayerValues);
       :total-players="totalPlayers"
       :season="activeLeague?.season ?? (isDemoLeague ? '2026' : undefined)"
       :league-last-updated="activeLeague?.lastUpdated"
+      :scoring-type="activeLeague?.scoringType"
       @build-trade="openPlayerInTradeBuilder"
     />
     <div
