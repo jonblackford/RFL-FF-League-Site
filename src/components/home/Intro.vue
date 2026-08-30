@@ -58,7 +58,7 @@ const {
   >
     <div
       aria-hidden="true"
-      :class="['absolute inset-0 saas-bg', isDark ? 'saas-bg-dark' : '']"
+      :class="['absolute inset-0 league-bg', isDark ? 'league-bg-dark' : '']"
     />
     <div
       aria-hidden="true"
@@ -88,7 +88,7 @@ const {
             <p
               class="inline-flex items-center px-3 py-1 text-xs font-semibold border rounded-full border-border/80 bg-background/80 text-muted-foreground backdrop-blur"
             >
-              Powering 14,000+ fantasy leagues
+              Built for the RFL fantasy football league
             </p>
             <h1
               id="intro-home-heading"
@@ -105,7 +105,7 @@ const {
 
             <h2 class="max-w-lg mt-5 text-lg text-muted-foreground lg:text-xl">
               Analyze your Sleeper or ESPN league with power rankings, roster
-              insights, weekly recaps, playoff odds, and more.
+              insights, playoff odds, player values, and more.
             </h2>
             <Card class="p-4 mt-8">
               <div class="mb-4 text-left">
@@ -194,7 +194,7 @@ const {
 </template>
 
 <style scoped>
-.saas-bg {
+.league-bg {
   background-image:
     radial-gradient(
       circle at 20% 10%,
@@ -219,7 +219,7 @@ const {
     );
 }
 
-.saas-bg-dark {
+.league-bg-dark {
   background-image:
     radial-gradient(
       circle at 20% 10%,
@@ -239,7 +239,7 @@ const {
     linear-gradient(to bottom, hsl(222.2 20% 4.9%), hsl(222.2 20% 4.9%));
 }
 
-.saas-bg::after {
+.league-bg::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -251,7 +251,7 @@ const {
   pointer-events: none;
 }
 
-.saas-bg-dark::after {
+.league-bg-dark::after {
   background-image:
     linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
