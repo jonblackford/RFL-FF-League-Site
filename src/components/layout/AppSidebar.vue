@@ -25,12 +25,6 @@ import {
   TicketPercent,
   Trophy,
   Users,
-  Info,
-  ScrollText,
-  ShieldUser,
-  CircleUserRound,
-  BadgeCheck,
-  Handshake,
   Dices,
   FlaskConical,
   IdCard,
@@ -39,24 +33,14 @@ import {
 import { Separator } from "../ui/separator";
 import { useStore } from "../../store/store";
 import { useRoute, useRouter } from "vue-router";
-import { useAuthStore } from "@/store/auth";
-import { useSubscriptionStore } from "@/store/subscription";
 import { clearPendingCheckout } from "@/lib/pendingCheckout";
 import { sidebarLeagueFeatures, type LeagueFeature } from "@/lib/features";
 
 const store = useStore();
-const authStore = useAuthStore();
-const subStore = useSubscriptionStore();
 const route = useRoute();
 const router = useRouter();
 const props = defineProps<SidebarProps>();
 const { isMobile, setOpenMobile } = useSidebar();
-
-const currentUser = computed(() => {
-  if (authStore.isAuthenticated) {
-    return authStore.user?.email?.match(/^[^@]+(?=@)/)?.[0] ?? "";
-  }
-});
 
 const defaultRouteQuery = computed(() => {
   const {
@@ -71,19 +55,7 @@ const defaultRouteQuery = computed(() => {
   return query;
 });
 
-const defaultAccountRoute = computed(() => ({
-  path: "/account",
-  query: defaultRouteQuery.value,
-}));
-
 const closeMobileSidebar = () => {
-  if (isMobile.value) {
-    setOpenMobile(false);
-  }
-};
-
-const RouteTabChange = () => {
-  clearPendingCheckout();
   if (isMobile.value) {
     setOpenMobile(false);
   }
@@ -215,114 +187,6 @@ const data = computed(() => ({
                   </p>
                 </div>
               </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
-
-      <SidebarGroup class="mt-auto">
-        <Separator
-          orientation="horizontal"
-          class="mr-2 mb-2 data-[orientation=vertical]:h-4"
-        />
-        <SidebarGroupContent>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <router-link
-                :to="{ path: '/about', query: defaultRouteQuery }"
-                class="cursor-pointer"
-                @click="RouteTabChange"
-              >
-                <SidebarMenuButton
-                  :is-active="route.path === '/about'"
-                  as-child
-                >
-                  <div>
-                    <Info />
-                    About
-                  </div>
-                </SidebarMenuButton>
-              </router-link>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <router-link
-                :to="{ path: '/changelog', query: defaultRouteQuery }"
-                class="cursor-pointer"
-                @click="RouteTabChange"
-              >
-                <SidebarMenuButton
-                  :is-active="route.path === '/changelog'"
-                  as-child
-                >
-                  <div>
-                    <ScrollText />
-                    Changelog
-                  </div>
-                </SidebarMenuButton>
-              </router-link>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <router-link
-                :to="{ path: '/privacy', query: defaultRouteQuery }"
-                class="cursor-pointer"
-                @click="RouteTabChange"
-              >
-                <SidebarMenuButton
-                  as-child
-                  :is-active="route.path === '/privacy'"
-                >
-                  <div>
-                    <ShieldUser />
-                    Privacy Policy
-                  </div>
-                </SidebarMenuButton></router-link
-              >
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <router-link
-                :to="{ path: '/terms', query: defaultRouteQuery }"
-                class="cursor-pointer"
-                @click="RouteTabChange"
-              >
-                <SidebarMenuButton
-                  as-child
-                  :is-active="route.path === '/terms'"
-                >
-                  <div>
-                    <Handshake />
-                    Terms of Service
-                  </div>
-                </SidebarMenuButton></router-link
-              >
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <router-link
-                :to="defaultAccountRoute"
-                class="cursor-pointer"
-                @click="RouteTabChange"
-              >
-                <SidebarMenuButton
-                  :is-active="route.path === '/account'"
-                  as-child
-                >
-                  <div>
-                    <CircleUserRound />
-                    Account
-                    <span
-                      v-if="authStore.isAuthenticated && !subStore.isPremium"
-                      >({{ currentUser?.slice(0, 16) }})</span
-                    >
-                    <span
-                      class="flex"
-                      v-else-if="
-                        authStore.isAuthenticated && subStore.isPremium
-                      "
-                      >({{ currentUser?.slice(0, 16)
-                      }}<BadgeCheck class="mt-0.5 ml-2" :size="15" />)</span
-                    >
-                  </div>
-                </SidebarMenuButton>
-              </router-link>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroupContent>
