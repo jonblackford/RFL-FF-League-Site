@@ -1,4 +1,7 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
+import * as playerApi from "../src/api/playerApi";
+import * as sleeperApi from "../src/api/sleeperApi";
+import * as tradeValuesApi from "../src/api/tradeValuesApi";
 import {
   estimateLocalTradeQuote,
   generateLocalTradeSuggestions,
@@ -6,6 +9,7 @@ import {
   buildDynastyDraftPickAssets,
   buildTradeValueRequest,
   getTradeValuationMode,
+  loadLeaguePlayerValues,
   mergeTradeBuilderRankings,
   sortTradeBuilderPlayers,
 } from "../src/lib/leagueTradeValues";
@@ -31,6 +35,10 @@ const player = ({
 });
 
 describe("trade value request boundary", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   test("generates local trade suggestions from roster fit without backend access", () => {
     const suggestions = generateLocalTradeSuggestions({
       forRosterId: 1,
@@ -311,6 +319,93 @@ describe("trade value request boundary", () => {
     ]);
     expect(JSON.stringify(request)).not.toContain("tradeValue");
     expect(JSON.stringify(request)).not.toContain("projectedPoints");
+  });
+
+  test("falls back to local player values when the backend is unavailable", async () => {
+    vi.spyOn(tradeValuesApi, "getPlayerValues").mockRejectedValue(
+      new Error("missing backend")
+    );
+    vi.spyOn(playerApi, "getPlayersByIdsMap").mockResolvedValue(
+      new Map([
+        [
+          "p1",
+          { player_id: "p1", name: "Alpha RB", position: "RB", team: "DET" },
+        ],
+        [
+          "p2",
+          { player_id: "p2", name: "Alpha WR", position: "WR", team: "MIN" },
+        ],
+        [
+          "p3",
+          { player_id: "p3", name: "Beta QB", position: "QB", team: "BUF" },
+        ],
+      ])
+    );
+    vi.spyOn(sleeperApi, "getDraftProjections").mockImplementation(
+      async (playerId) => ({
+        adp: playerId === "p3" ? 15 : null,
+        projectedPoints: playerId === "p3" ? 310 : playerId === "p1" ? 210 : 190,
+      })
+    );
+    vi.spyOn(sleeperApi, "getStats").mockImplementation(async (playerId) => ({
+      rank: playerId === "p3" ? 2 : playerId === "p1" ? 12 : 18,
+      points: playerId === "p3" ? 285 : playerId === "p1" ? 174 : 160,
+      overallRank: playerId === "p3" ? 8 : playerId === "p1" ? 36 : 48,
+      ppg: 0,
+      firstName: "",
+      lastName: "",
+      position: "",
+      team: "",
+      id: playerId,
+      gp: 0,
+    }));
+
+    const result = await loadLeaguePlayerValues({
+      league: {
+        leagueId: "league-1",
+        season: "2026",
+        status: "in_season",
+        scoringType: 1,
+        scoringSettings: { rec: 1 },
+        rosterPositions: ["QB", "RB", "WR", "FLEX", "BN"],
+        totalRosters: 2,
+        seasonType: "Redraft",
+        platform: "sleeper",
+      },
+      tableData: [
+        {
+          rosterId: 1,
+          name: "Alpha",
+          username: "alpha-user",
+          starters: [["p1"]],
+          benchPlayers: [["p2"]],
+          players: ["p1", "p2"],
+        },
+        {
+          rosterId: 2,
+          name: "Beta",
+          username: "beta-user",
+          starters: [["p3"]],
+          benchPlayers: [[]],
+          players: ["p3"],
+        },
+      ],
+      selectedWeek: 1,
+      showUsernames: false,
+    });
+
+    expect(result.access).toBe("premium");
+    expect(result.totalPlayers).toBe(3);
+    expect(result.rosters[0].players).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          playerId: "p1",
+          name: "Alpha RB",
+          projectedPoints: 210,
+          tradeValue: expect.any(Number),
+        }),
+      ])
+    );
   });
 
   test("assigns future picks to their current dynasty owner", () => {

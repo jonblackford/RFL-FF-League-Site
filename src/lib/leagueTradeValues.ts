@@ -14,6 +14,7 @@ import {
   estimateLocalTradeQuote,
   generateLocalTradeSuggestions,
   type DynastyPerspective,
+  type LocalTradeFinderPlayer,
   type TradeFinderPlayer,
   type TradeFinderRoster,
   type TradeValuationMode,
@@ -230,6 +231,147 @@ const groupRankingsByRoster = (
   }));
 };
 
+const getFallbackTradeValue = ({
+  projectedPoints,
+  replacementPoints,
+  overallRank,
+  positionRank,
+  dynastyAdp,
+}: {
+  projectedPoints: number;
+  replacementPoints: number;
+  overallRank: number;
+  positionRank: number;
+  dynastyAdp: number | null;
+}) => {
+  const vorpValue = Math.max(0, projectedPoints - replacementPoints);
+  const rankValue =
+    dynastyAdp && dynastyAdp > 0
+      ? Math.max(1, 120 - dynastyAdp)
+      : overallRank > 0
+        ? Math.max(1, 110 - overallRank)
+        : positionRank > 0
+          ? Math.max(1, 65 - positionRank)
+          : 1;
+
+  return Number(Math.max(rankValue, vorpValue / 2).toFixed(1));
+};
+
+const getReplacementBaselines = (
+  players: LocalTradeFinderPlayer[],
+  rosterPositions: string[]
+) => {
+  const startersByPosition = rosterPositions
+    .filter((slot) => !["BN", "IR", "TAXI"].includes(slot.toUpperCase()))
+    .reduce<Record<string, number>>((counts, slot) => {
+      const position = slot.toUpperCase();
+      if (["FLEX", "SUPER_FLEX", "REC_FLEX", "WRRB_FLEX"].includes(position)) {
+        return counts;
+      }
+      counts[position] = (counts[position] ?? 0) + 1;
+      return counts;
+    }, {});
+
+  const baselines = new Map<string, number>();
+  Object.keys(startersByPosition).forEach((position) => {
+    const sorted = players
+      .filter((player) => player.position?.toUpperCase() === position)
+      .sort((a, b) => (b.projectedPoints ?? 0) - (a.projectedPoints ?? 0));
+    const replacementIndex = Math.max(0, startersByPosition[position] - 1);
+    const replacementPlayer = sorted[replacementIndex];
+    baselines.set(position, replacementPlayer?.projectedPoints ?? 0);
+  });
+
+  return baselines;
+};
+
+const buildLocalPlayerValues = async (
+  request: TradeValueRequestPayload
+): Promise<PlayerValuesResponse> => {
+  const playerIds = [...new Set(request.rosters.flatMap((r) => r.playerIds))];
+  const playerMap = await getPlayersByIdsMap(playerIds);
+  const dynasty = request.league.seasonType.toLowerCase() === "dynasty";
+  const superflex = isSuperflexLeague(request.league.rosterPositions);
+  const idpPositions = new Set(["DB", "DL", "LB", "CB", "DE", "DT", "NT", "S"]);
+
+  const entries = await mapWithConcurrency(
+    playerIds,
+    TRADE_BUILDER_RANKING_CONCURRENCY,
+    async (playerId): Promise<LocalTradeFinderPlayer> => {
+      const player = playerMap.get(playerId);
+      const stats = dynasty
+        ? null
+        : await getStats(
+            playerId,
+            request.league.season,
+            request.league.scoringType
+          );
+      const projection = await getDraftProjections(
+        playerId,
+        request.league.season,
+        request.league.scoringType,
+        dynasty ? "Dynasty" : request.league.seasonType,
+        superflex,
+        idpPositions.has(player?.position?.toUpperCase() ?? "")
+      );
+
+      return {
+        playerId,
+        player_id: playerId,
+        name:
+          player?.name ||
+          [stats?.firstName, stats?.lastName].filter(Boolean).join(" ") ||
+          `${player?.team ?? stats?.team ?? "FA"} Defense`,
+        position: player?.position || stats?.position || "",
+        team: player?.team || stats?.team || "FA",
+        projectedPoints:
+          projection.projectedPoints ?? Number(stats?.points || 0),
+        replacementPoints: 0,
+        vorp: 0,
+        tradeValue: 0,
+        positionRank: Number(stats?.rank || 0),
+        overallRank: Number(stats?.overallRank || 0),
+        dynastyAdp: projection.adp,
+      };
+    }
+  );
+  const baselines = getReplacementBaselines(entries, request.league.rosterPositions);
+  const rankings: TradeFinderPlayer[] = entries
+    .map((player): TradeFinderPlayer => {
+      const projectedPoints = player.projectedPoints ?? 0;
+      const replacementPoints =
+        baselines.get(player.position.toUpperCase()) ??
+        Math.max(0, projectedPoints * 0.6);
+      const vorp = Math.max(0, projectedPoints - replacementPoints);
+      return {
+        ...player,
+        projectedPoints,
+        replacementPoints: Number(replacementPoints.toFixed(1)),
+        vorp: Number(vorp.toFixed(1)),
+        tradeValue: getFallbackTradeValue({
+          projectedPoints,
+          replacementPoints,
+          overallRank: player.overallRank ?? 0,
+          positionRank: player.positionRank ?? 0,
+          dynastyAdp: player.dynastyAdp ?? null,
+        }),
+      };
+    })
+    .sort(
+      (a, b) =>
+        a.overallRank - b.overallRank ||
+        b.tradeValue - a.tradeValue ||
+        b.projectedPoints - a.projectedPoints
+    );
+
+  return {
+    access: "premium",
+    previewLimit: rankings.length,
+    totalPlayers: rankings.length,
+    rankings,
+  };
+};
+
 export const loadLeaguePlayerValues = async (options: {
   league: LeagueInfoType;
   tableData: TableDataType[];
@@ -238,7 +380,13 @@ export const loadLeaguePlayerValues = async (options: {
   dynastyPerspective?: DynastyPerspective;
 }): Promise<LeaguePlayerValuesResult> => {
   const request = buildTradeValueRequest(options);
-  const response = await getPlayerValues(request);
+  let response: PlayerValuesResponse;
+  try {
+    response = await getPlayerValues(request);
+  } catch (error) {
+    console.warn("Unable to load remote player values:", error);
+    response = await buildLocalPlayerValues(request);
+  }
   return {
     ...response,
     request,
