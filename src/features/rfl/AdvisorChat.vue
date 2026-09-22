@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref, watch, onBeforeUnmount } from "vue";
-import type { buildEvidence } from "./presentation";
 import { requestGeminiAnswer } from "./gemini";
 const props = defineProps<{
-  evidence: ReturnType<typeof buildEvidence>;
+  evidence: Record<string, unknown>;
   disabled?: boolean;
 }>();
 const question = ref("");

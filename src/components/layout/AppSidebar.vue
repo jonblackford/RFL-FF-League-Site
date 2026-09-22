@@ -172,7 +172,6 @@ const data = computed(() => ({
       class="mr-2 mt-2 data-[orientation=vertical]:h-4"
     />
     <SidebarContent>
-      <RouterLink to="/rfl" class="mx-4 my-2 rounded-lg border px-3 py-2 text-sm font-semibold" @click="closeMobileSidebar">Dart Vader · RFL Advisor ↗</RouterLink>
       <SidebarGroup v-for="item in data.navMain">
         <SidebarGroupContent>
           <SidebarMenu>
