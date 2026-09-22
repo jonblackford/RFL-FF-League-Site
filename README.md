@@ -102,7 +102,6 @@ npm run dev:api
 
 - `GEMINI_API_KEY`: your Google AI Studio API key; never put this in a `VITE_` variable or the browser.
 - `GEMINI_MODEL`: defaults to `gemini-3-flash-preview`; configurable as provider availability changes.
-- `RFL_ADVISOR_TOKEN`: a long random access token for your private instance. Enter this token (not the Gemini key) under **Connect private AI access**. It stays in browser memory for the visit.
 
 The Vite development server proxies `/api/rfl-advisor` to the local API on port 3001. The default model has a free tier in the [Gemini pricing documentation](https://ai.google.dev/gemini-api/docs/pricing), subject to provider limits, regional eligibility, and model changes. Keep the Google project on its free tier if you want no inference charges; application code cannot enforce your provider billing settings. Free-tier inputs may be used by Google to improve products under its terms. The app sends a compact roster/scoring snapshot and your question, not the full player directory.
 
@@ -110,7 +109,7 @@ The Vite development server proxies `/api/rfl-advisor` to the local API on port 
 
 On Vercel, configure the same server environment variables and deploy the existing project normally. `api/rfl-advisor.ts` provides the AI endpoint; `/rfl` is rewritten to the SPA. Nothing is deployed automatically by this change. Restrict access to your private instance and keep provider quota limits in place. The endpoint requires the private token, caps requests and output, caches identical requests for five minutes, and allows five uncached calls per minute **per server instance**. The in-memory limit is not a global spending cap across serverless instances.
 
-GitHub Pages supports calculated advice using the existing hash router. It cannot run the serverless endpoint. AI requires a same-origin `/api/rfl-advisor` service/reverse proxy; Vercel or the local runner is the supported straightforward setup. Do not publish credentials with static assets.
+GitHub Pages supports calculated advice using the existing hash router. It cannot run the serverless endpoint. For AI on GitHub Pages, expand **Connect Gemini AI** in the advisor and enter your own Google AI Studio API key. The browser sends that key directly to Google and keeps it only in memory for the current tab; it is not sent to this project or stored by the app. Use a restricted key and keep billing disabled if you want a free setup. This bring-your-own-key mode does not hide the key from the browser or other software running on the device.
 
 ### Data limits
 

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, watch, onBeforeUnmount } from "vue";
 import type { buildEvidence } from "./presentation";
+import { requestGeminiAnswer } from "./gemini";
 const props = defineProps<{
   evidence: ReturnType<typeof buildEvidence>;
   disabled?: boolean;
 }>();
 const question = ref("");
-const token = ref("");
+const apiKey = ref("");
 const answer = ref("");
 const error = ref("");
 const loading = ref(false);
@@ -32,30 +33,14 @@ async function ask(prompt?: string) {
   error.value = "";
   answer.value = "";
   try {
-    const response = await fetch("/api/rfl-advisor", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token.value}`,
-      },
-      body: JSON.stringify({
-        question: question.value,
-        evidence: props.evidence,
-      }),
-      signal: AbortSignal.any([active.signal, AbortSignal.timeout(25000)]),
-    });
-    if (!response.headers.get("content-type")?.includes("application/json"))
-      throw new Error(
-        "AI service is not running. Start the advisor API or configure it on your hosting service. Your calculated recommendations still work.",
-      );
-    const data = await response.json();
-    if (!response.ok)
-      throw new Error(
-        data.error || "AI is unavailable. Please try again later.",
-      );
-    if (typeof data.answer !== "string")
-      throw new Error("AI returned an invalid response.");
-    if (controller === active) answer.value = data.answer;
+    if (!apiKey.value.trim())
+      throw new Error("Enter your Gemini API key below before asking the advisor.");
+    answer.value = await requestGeminiAnswer(
+      apiKey.value.trim(),
+      question.value,
+      props.evidence,
+      { signal: AbortSignal.any([active.signal, AbortSignal.timeout(60000)]) },
+    );
   } catch (e) {
     if (controller === active && !active.signal.aborted)
       error.value = e instanceof Error ? e.message : "AI is unavailable.";
@@ -128,22 +113,22 @@ async function ask(prompt?: string) {
       </div>
     </form>
     <details class="connection-details">
-      <summary>Connect private AI access</summary>
+      <summary>Connect Gemini AI</summary>
       <p>
-        Enter your advisor access token configured by the site owner. This is
-        not a Gemini API key. It stays in memory for this visit.
+        Enter your own Google AI Studio API key. It is used directly from this
+        browser tab and is not saved by this site.
       </p>
-      <label for="advisor-token">Advisor access token</label
+      <label for="advisor-api-key">Gemini API key</label
       ><input
-        id="advisor-token"
-        v-model="token"
+        id="advisor-api-key"
+        v-model="apiKey"
         type="password"
         autocomplete="off"
-        placeholder="Private access token"
+        placeholder="Paste your Gemini API key"
       />
       <p>
-        AI requires a configured server and is subject to free-tier limits.
-        Calculated recommendations are always available without AI.
+        The key remains in memory for this visit and is sent only to Google.
+        Use a restricted key and keep billing disabled if you want a free setup.
       </p>
     </details>
     <p v-if="loading" role="status" class="ai-message">
