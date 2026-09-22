@@ -53,9 +53,11 @@ const defaultMeta = {
 };
 
 const routes = [
+  { path: "/rfl", component: () => import("./views/RflAdvisor.vue"), meta: { title: "Dart Vader | RFL Advisor", standalone: true, robots: "noindex, follow" } },
   {
     path: "/",
     component: Home,
+    beforeEnter: (to: { query: Record<string, unknown> }) => Object.keys(to.query).length ? true : { path: "/rfl" },
     meta: defaultMeta,
   },
   {

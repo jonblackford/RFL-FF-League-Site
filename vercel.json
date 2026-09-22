@@ -8,9 +8,16 @@
     "api/report-image.ts": {
       "includeFiles": "server/og-assets/**",
       "maxDuration": 10
+    },
+    "api/rfl-advisor.ts": {
+      "maxDuration": 30
     }
   },
   "rewrites": [
+    {
+      "source": "/rfl",
+      "destination": "/index.html"
+    },
     {
       "source": "/about",
       "destination": "/about/index.html"

@@ -10,6 +10,7 @@ export const getViteBasePath = (env: NodeJS.ProcessEnv = process.env) =>
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   base: getViteBasePath(),
+  server: { proxy: { "/api/rfl-advisor": "http://127.0.0.1:3001" } },
   plugins: [
     vue(),
     ...(mode === "development" ? [vueDevTools()] : []),
@@ -69,6 +70,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   test: {
+    include: ["test/**/*.{test,spec}.{js,ts}"],
     exclude: [...configDefaults.exclude, "e2e/**"],
   },
 }));
