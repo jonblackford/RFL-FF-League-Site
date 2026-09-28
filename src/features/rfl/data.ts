@@ -1,4 +1,5 @@
 import type {
+  AdvisorSelection,
   RflLeague,
   RflRoster,
   RflPlayer,
@@ -171,19 +172,22 @@ function parseRoster(value: unknown): RflRoster {
     taxi: ids("taxi"),
   };
 }
-export async function loadRflSnapshot(
-  requestedWeek?: number,
+export async function loadLeagueSnapshot(
+  selection: AdvisorSelection,
   signal?: AbortSignal,
   force = false,
 ): Promise<RflSnapshot> {
+  const { leagueId, rosterId, week: requestedWeek } = selection;
+  if (selection.provider !== "sleeper" || !/^\d{1,25}$/.test(leagueId) || !Number.isInteger(rosterId) || rosterId < 1)
+    throw new Error("Select a valid Sleeper league and roster");
   const requestSignal = signal
     ? AbortSignal.any([signal, AbortSignal.timeout(25000)])
     : AbortSignal.timeout(25000);
   const [rawLeague, state, rawRosters] = await Promise.all([
-    getJson(`/v1/league/${RFL_LEAGUE_ID}`, requestSignal, 300000, force),
+    getJson(`/v1/league/${leagueId}`, requestSignal, 300000, force),
     getJson("/v1/state/nfl", requestSignal, 300000, force),
     getJson(
-      `/v1/league/${RFL_LEAGUE_ID}/rosters`,
+      `/v1/league/${leagueId}/rosters`,
       requestSignal,
       300000,
       force,
@@ -191,18 +195,25 @@ export async function loadRflSnapshot(
   ]);
   if (
     !record(rawLeague) ||
-    rawLeague.league_id !== RFL_LEAGUE_ID ||
+    rawLeague.league_id !== leagueId ||
     !record(rawLeague.scoring_settings) ||
     !Array.isArray(rawLeague.roster_positions) ||
     !record(rawLeague.settings) ||
     typeof rawLeague.season !== "string"
   )
-    throw new Error("Sleeper did not return the expected RFL league");
+    throw new Error("Sleeper did not return the selected league");
   if (!Array.isArray(rawRosters)) throw new Error("Invalid league rosters");
   const league = rawLeague as unknown as RflLeague;
   const rosters = rawRosters.map(parseRoster);
-  const roster = rosters.find((r) => r.roster_id === RFL_ROSTER_ID);
-  if (!roster) throw new Error("Dart Vader roster was not found");
+  const roster = rosters.find((r) => r.roster_id === rosterId);
+  if (!roster) throw new Error("Selected roster was not found");
+  try {
+    const users = await getJson(`/v1/league/${leagueId}/users`, requestSignal, 300000, force);
+    if (Array.isArray(users)) for (const r of rosters) {
+      const u = users.find((u) => record(u) && u.user_id === r.owner_id);
+      if (record(u)) r.teamName = String((record(u.metadata) && u.metadata.team_name) || u.display_name || `Team ${r.roster_id}`);
+    }
+  } catch { if (requestSignal.aborted) throw requestSignal.reason; }
   const currentWeek =
     record(state) && String(state.season) === league.season
       ? Number(state.week)
@@ -303,4 +314,8 @@ export function createLatestLoader() {
       }
     },
   };
+}
+
+export function loadRflSnapshot(week?: number, signal?: AbortSignal, force = false) {
+ return loadLeagueSnapshot({provider: "sleeper", leagueId: RFL_LEAGUE_ID, rosterId: RFL_ROSTER_ID, week}, signal, force);
 }

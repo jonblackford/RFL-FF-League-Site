@@ -41,7 +41,7 @@ it("sends bounded team evidence with uncertainty and no directory or secrets", (
     },
     week: 3,
     fetchedAt: 123,
-    roster: { players: ["a"], starters: ["a"] },
+    roster: { roster_id: 2, teamName: "Selected manager", players: ["a"], starters: ["a"] },
     players: [player, { ...player, id: "unowned" }],
     warnings: ["Locks unverified"],
   };
@@ -53,7 +53,7 @@ it("sends bounded team evidence with uncertainty and no directory or secrets", (
   expect(evidence.players).toHaveLength(1);
   expect(evidence.players[0].missing).toEqual(["st_td"]);
   expect(evidence.warnings).toContain("Locks unverified");
-  expect(evidence.team).toBe("Dart Vader");
+  expect(evidence.team).toBe("Selected manager");
   expect(evidence.currentStarters).toEqual(["a"]);
 });
 it("does not compare against a forecast for an unavailable current starter", async () => {

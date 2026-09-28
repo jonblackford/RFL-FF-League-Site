@@ -1,3 +1,4 @@
+export type AdvisorSelection = { provider: "sleeper"; leagueId: string; rosterId: number; week?: number };
 export type Stats = Record<string, number>;
 export type Score = {
   total: number | null;
@@ -23,6 +24,7 @@ export type RflPlayer = {
   sourceUpdated: number | null;
 };
 export type RflRoster = {
+  teamName?: string;
   roster_id: number;
   owner_id: string;
   players: string[];

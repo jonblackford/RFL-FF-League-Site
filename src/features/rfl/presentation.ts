@@ -40,7 +40,10 @@ export function buildEvidence(
   });
   return {
     leagueId: snapshot.league.league_id,
-    team: "Dart Vader",
+    team: snapshot.roster.teamName || `Team ${snapshot.roster.roster_id ?? "unknown"}`,
+    rosterId: snapshot.roster.roster_id,
+    leagueName: snapshot.league.name,
+    provider: "sleeper",
     season: snapshot.league.season,
     week: snapshot.week,
     fetchedAt: snapshot.fetchedAt,
