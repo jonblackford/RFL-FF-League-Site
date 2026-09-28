@@ -41,3 +41,45 @@ it("maps provider failures without exposing provider response text", async () =>
     );
   }
 });
+it("checks Google model access without generating text or exposing the key in the URL", async () => {
+  const { checkGeminiConnection } = await import("../src/features/rfl/gemini");
+  const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+    expect(url).toBe(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview",
+    );
+    expect(url).not.toContain("private-key");
+    expect(init?.headers).toMatchObject({ "x-goog-api-key": "private-key" });
+    expect(init?.body).toBeUndefined();
+    return new Response(
+      JSON.stringify({ supportedGenerationMethods: ["generateContent"] }),
+    );
+  });
+  await expect(
+    checkGeminiConnection("private-key", { fetcher }),
+  ).resolves.toBeUndefined();
+  expect(fetcher).toHaveBeenCalledOnce();
+});
+it("rejects missing credentials before sending and reports network failures clearly", async () => {
+  const { checkGeminiConnection } = await import("../src/features/rfl/gemini");
+  const fetcher = vi.fn(async () => {
+    throw new TypeError("Failed to fetch");
+  });
+  await expect(checkGeminiConnection(" ", { fetcher })).rejects.toThrow("key");
+  expect(fetcher).not.toHaveBeenCalled();
+  await expect(checkGeminiConnection("key", { fetcher })).rejects.toThrow(
+    "reach Google",
+  );
+});
+it("does not mark an inaccessible or nongenerating model as verified", async () => {
+  const { checkGeminiConnection } = await import("../src/features/rfl/gemini");
+  for (const response of [
+    new Response("{}", { status: 403 }),
+    new Response(
+      JSON.stringify({ supportedGenerationMethods: ["embedContent"] }),
+    ),
+  ]) {
+    await expect(
+      checkGeminiConnection("key", { fetcher: vi.fn(async () => response) }),
+    ).rejects.toThrow();
+  }
+});

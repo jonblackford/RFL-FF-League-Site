@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount } from "vue";
+import {
+  firebaseAiEnabled,
+  requestFirebaseAnswer,
+} from "../advisor/firebaseAi";
 import { advisorAnalysisModes } from "../advisor/intelligence";
-import { requestGeminiAnswer } from "./gemini";
+import { requestGeminiAnswer, checkGeminiConnection } from "./gemini";
 import {
   advisorApiKey,
+  advisorConnection,
   advisorModel,
   advisorConversation,
   conversationRevision,
@@ -16,6 +21,7 @@ const props = defineProps<{
 const question = ref(props.initialQuestion || ""),
   error = ref(""),
   loading = ref(false);
+const checking = ref(false);
 const key = computed(() =>
   [
     props.evidence.provider || "sleeper",
@@ -35,6 +41,7 @@ function cancel() {
   controller = undefined;
   advisorConversation.cancel();
   loading.value = false;
+  checking.value = false;
   conversationRevision.value++;
 }
 watch(
@@ -50,17 +57,44 @@ watch(
     error.value = "";
   },
 );
+watch([advisorApiKey, advisorModel], () => {
+  cancel();
+  error.value = "";
+});
 onBeforeUnmount(cancel);
+async function checkConnection() {
+  if (checking.value || loading.value) return;
+  const active = new AbortController();
+  controller = active;
+  checking.value = true;
+  error.value = "";
+  try {
+    await checkGeminiConnection(advisorApiKey.value, {
+      model: advisorModel.value,
+      signal: AbortSignal.any([active.signal, AbortSignal.timeout(15000)]),
+    });
+    if (controller === active && !active.signal.aborted)
+      advisorConnection.value = "verified";
+  } catch (e) {
+    if (controller === active && !active.signal.aborted) {
+      advisorConnection.value = "unverified";
+      error.value =
+        e instanceof Error ? e.message : "Unable to check Google connection.";
+    }
+  } finally {
+    if (controller === active) checking.value = false;
+  }
+}
 function reset() {
   cancel();
   advisorConversation.reset(key.value);
   conversationRevision.value++;
 }
 async function ask(prompt?: string) {
-  if (loading.value || props.disabled) return;
+  if (loading.value || checking.value || props.disabled) return;
   if (prompt) question.value = prompt;
   if (!question.value.trim()) return;
-  if (!advisorApiKey.value.trim()) {
+  if (!firebaseAiEnabled && !advisorApiKey.value.trim()) {
     error.value = "Connect your Gemini API key below to ask the advisor.";
     return;
   }
@@ -74,24 +108,28 @@ async function ask(prompt?: string) {
       selected,
       question.value,
       Number(props.evidence.fetchedAt) || Date.now(),
-      (history) =>
-        requestGeminiAnswer(
-          advisorApiKey.value.trim(),
-          question.value,
-          props.evidence,
-          {
-            history,
-            model: advisorModel.value,
-            signal: AbortSignal.any([
-              active.signal,
-              AbortSignal.timeout(60000),
-            ]),
-          },
-        ),
+      (history) => {
+        const options = {
+          history,
+          model: advisorModel.value,
+          signal: AbortSignal.any([active.signal, AbortSignal.timeout(60000)]),
+        };
+        return firebaseAiEnabled
+          ? requestFirebaseAnswer(question.value, props.evidence, options)
+          : requestGeminiAnswer(
+              advisorApiKey.value.trim(),
+              question.value,
+              props.evidence,
+              options,
+            );
+      },
     );
     conversationRevision.value++;
     await pending;
-    if (controller === active) question.value = "";
+    if (controller === active) {
+      question.value = "";
+      advisorConnection.value = "answered";
+    }
   } catch (e) {
     if (controller === active && !active.signal.aborted)
       error.value = e instanceof Error ? e.message : "AI unavailable";
@@ -108,7 +146,14 @@ async function ask(prompt?: string) {
       displayed evidence.
     </p>
     <div class="ad-actions">
-      <button v-for="mode in advisorAnalysisModes" :key="mode.id" :disabled="loading || disabled" @click="ask(mode.question)">{{ mode.label }}</button>
+      <button
+        v-for="mode in advisorAnalysisModes"
+        :key="mode.id"
+        :disabled="loading || disabled"
+        @click="ask(mode.question)"
+      >
+        {{ mode.label }}
+      </button>
       <button @click="reset">New conversation</button>
     </div>
     <div class="ad-messages" aria-live="polite">
@@ -157,12 +202,24 @@ async function ask(prompt?: string) {
     <p v-if="error" role="alert" class="ad-error">
       {{ error }} You can retry your question.
     </p>
-    <details :open="!advisorApiKey" class="ad-connection">
+    <p v-if="firebaseAiEnabled" class="ad-muted">
+      Uses RFL Agent's Google AI connection. No personal API key is needed. Free
+      usage limits apply.
+    </p>
+    <details
+      v-else
+      :open="!advisorApiKey || advisorConnection === 'unverified'"
+      class="ad-connection"
+    >
       <summary>
         {{
-          advisorApiKey
-            ? "Gemini connected for this visit"
-            : "Connect Gemini AI"
+          !advisorApiKey
+            ? "Connect Gemini AI"
+            : advisorConnection === "answered"
+              ? "Google AI responded this visit"
+              : advisorConnection === "verified"
+                ? "Google connection verified"
+                : "Key entered — connection not verified"
         }}
       </summary>
       <label for="advisor-api-key"
@@ -178,10 +235,28 @@ async function ask(prompt?: string) {
           v-model="advisorModel"
           placeholder="Gemini model ID"
       /></label>
+      <button
+        type="button"
+        :disabled="!advisorApiKey.trim() || loading || checking"
+        @click="checkConnection"
+      >
+        {{ checking ? "Checking Google…" : "Check Google connection" }}
+      </button>
+      <p v-if="advisorConnection === 'verified'" role="status" class="ad-muted">
+        Google accepted the key and model lookup. Generation quota is checked
+        when you ask a question.
+      </p>
       <p class="ad-muted">
         Sent directly to Google; the key stays in memory for this visit. Use a
         project without billing for a free setup. Provider quotas and model
-        availability apply.
+        availability apply. No request is sent until you enter a key and check
+        the connection or ask a question.
+        <a
+          href="https://aistudio.google.com/api-keys"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Get a Google AI Studio key</a
+        >.
       </p>
       <button
         v-if="advisorApiKey"

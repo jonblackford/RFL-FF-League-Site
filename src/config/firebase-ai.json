@@ -1,0 +1,12 @@
+{
+  "enabled": true,
+  "model": "gemini-3.1-flash-lite",
+  "firebase": {
+    "projectId": "rfl-agent",
+    "appId": "1:1078810053990:web:cf83c564b5493187774ca7",
+    "apiKey": "AIzaSyCEP-eJOHkRsYviCIYpW3qFsaX4S_eXZZM",
+    "authDomain": "rfl-agent.firebaseapp.com",
+    "messagingSenderId": "1078810053990"
+  },
+  "recaptchaSiteKey": "6LeLANQtAAAAAIVUGDcD8d46RNBadZQtkiVBPAD7"
+}

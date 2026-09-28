@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+const firebaseConfig = JSON.parse(readFileSync(new URL("../src/config/firebase-ai.json", import.meta.url), "utf8"));
 import { test, expect } from "@playwright/test";
 import {
   installLeagueApiMocks,
@@ -48,9 +50,16 @@ test("advisor connects team selection, comparisons, watchlists and AI on mobile"
     page.getByRole("heading", { name: "Every league. A clearer next move." }),
   ).toBeVisible();
   await expect(page.getByLabel("Team", { exact: true })).toHaveValue("1");
-  await page.getByRole('navigation',{name:'Advisor sections'}).getByRole('button',{name:'Insights',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Your weekly research desk'})).toBeVisible();
-  await expect(page.getByLabel('Football intelligence')).toContainText(/SCORING COVERAGE/i);
+  await page
+    .getByRole("navigation", { name: "Advisor sections" })
+    .getByRole("button", { name: "Insights", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Your weekly research desk" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Football intelligence")).toContainText(
+    /SCORING COVERAGE/i,
+  );
   await page.getByLabel("Team", { exact: true }).selectOption("2");
   await expect(
     page.getByText("Sleeper Team Two · Week 3", { exact: true }),
@@ -75,8 +84,12 @@ test("advisor connects team selection, comparisons, watchlists and AI on mobile"
   await expect(page.getByLabel("Your question")).toHaveValue(
     /Compare these players/,
   );
-  await page.getByRole("button", { name: "Ask advisor ↗" }).click();
-  await expect(page.getByRole("alert")).toContainText("Connect your Gemini");
+  if (!firebaseConfig.enabled) {
+    await page.getByRole("button", { name: "Ask advisor ↗" }).click();
+    await expect(page.getByRole("alert")).toContainText("Connect your Gemini");
+  } else {
+    await expect(page.getByLabel("Gemini API key")).toHaveCount(0);
+  }
   await page.getByRole("button", { name: "Close advisor" }).click();
   await page.getByText("Standings", { exact: true }).first().click();
   await page.getByText("Advisor", { exact: true }).first().click();
@@ -130,10 +143,25 @@ test("saved leagues isolate team preferences and bounded AI conversations", asyn
     }),
   );
   await page.route("**/stats/nfl/**", (r) => r.fulfill({ json: [] }));
+  await page.route("https://www.google.com/recaptcha/enterprise.js*", (r) =>
+    r.fulfill({
+      contentType: "application/javascript",
+      body: 'window.grecaptcha={enterprise:{ready:cb=>cb(),render:(_el,opts)=>{window.__rflCaptchaSuccess=opts.callback;return 1},execute:()=>{window.__rflCaptchaSuccess();return Promise.resolve("fixture-recaptcha")}}};',
+    }),
+  );
+  await page.route("https://firebaseappcheck.googleapis.com/**", (r) =>
+    r.fulfill({ json: { token: "fixture-app-check", ttl: "86400s" } }),
+  );
   const requests: any[] = [];
   await page.route(
-    "https://generativelanguage.googleapis.com/**",
+    /https:\/\/(generativelanguage|firebasevertexai)\.googleapis\.com\//,
     async (r) => {
+      if (r.request().method() === "GET") {
+        await r.fulfill({
+          json: { supportedGenerationMethods: ["generateContent"] },
+        });
+        return;
+      }
       requests.push(r.request().postDataJSON());
       await r.fulfill({
         json: {
@@ -159,7 +187,27 @@ test("saved leagues isolate team preferences and bounded AI conversations", asyn
     page.getByText("Sleeper Team Two · Week 3", { exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "✦ Ask advisor" }).click();
-  await page.getByLabel("Gemini API key").fill("mock-key-not-real");
+  if (!firebaseConfig.enabled) {
+    await page.getByRole("button", { name: "Ask advisor ↗" }).click();
+    await expect(page.getByRole("alert")).toContainText(
+      "Connect your Gemini API key",
+    );
+    expect(requests).toHaveLength(0);
+    await page.getByLabel("Gemini API key").fill("mock-key-not-real");
+    await expect(
+      page.getByText("Key entered — connection not verified", { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Check Google connection", exact: true })
+      .click();
+    await expect(
+      page.getByText("Google connection verified", { exact: true }),
+    ).toBeVisible();
+    expect(requests).toHaveLength(0);
+  } else {
+    await expect(page.getByLabel("Gemini API key")).toHaveCount(0);
+    await expect(page.getByText(/No personal API key is needed/)).toBeVisible();
+  }
   await page.getByRole("button", { name: "Ask advisor ↗" }).click();
   await expect(
     page.getByText("Grounded answer 1", { exact: true }),
@@ -182,9 +230,11 @@ test("saved leagues isolate team preferences and bounded AI conversations", asyn
   await expect(
     page.getByText("Grounded answer 1", { exact: true }),
   ).toHaveCount(0);
-  await expect(page.getByLabel("Gemini API key")).toHaveValue(
-    process.env.TEST_PAGES === "true" ? "mock-key-not-real" : "",
-  );
+  if (!firebaseConfig.enabled) {
+    await expect(page.getByLabel("Gemini API key")).toHaveValue(
+      process.env.TEST_PAGES === "true" ? "mock-key-not-real" : "",
+    );
+  }
   await page.getByRole("button", { name: "Close advisor" }).click();
   controls.sleeperLeagueId = SLEEPER_LEAGUE_ID;
   await page.goto(

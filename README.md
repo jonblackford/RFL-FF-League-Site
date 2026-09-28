@@ -29,9 +29,7 @@ npm install
 npm run dev
 ```
 
-Calculated league analysis needs no AI credential. Open **Ask advisor → Connect Gemini AI** to enter your Google AI Studio key. It stays in memory for the current visit and is sent directly to Google, not saved by the app. The model ID is configurable. Use a provider project without billing for a free setup; model availability and quotas are external. Provider failures leave calculated advice available.
-
-Conversations are isolated by provider, league, team, season and week. Answers retain their snapshot timestamp. Watchlists and saved league preferences persist on the device, not across devices. No lineup, trade or waiver transaction is submitted by this site.
+Calculated league analysis needs no AI credential. **Ask advisor** now uses the shared Firebase AI Logic connection for `rfl-agent`; visitors do not enter API keys. It uses the Gemini Developer API with `gemini-3.1-flash-lite`, App Check, and a project without linked billing. Free quotas apply; exhausted quota does not switch to a paid provider. See [Firebase setup and verification](docs/firebase-ai-free-tier.md).
 
 The existing `/api/rfl-advisor` endpoint remains a separately protected private RFL endpoint, not the public multi-league chat backend. To run that optional endpoint locally, configure server-only values from `.env.example` in `.env.local`, then run `npm run dev:api`. Never put provider keys in `VITE_` variables or commit environment files.
 

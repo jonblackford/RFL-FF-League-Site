@@ -35,3 +35,7 @@ Rulings: preserve existing specialized charts while unifying their surrounding l
 Final review corrections preserve missing score coverage through the Sleeper import and keep valid zero values from falling back to rank-based prices. Older cached bench zeroes without coverage metadata remain unknown until refreshed. Both were reproduced in failing regression checks before correction.
 
 Release validation: 452 unit tests, 17 browser tests (one opt-in live test skipped in the standard suite), three data-refresh tests, production and Pages builds. Five Pages browser checks including the opt-in live RFL Advisor check passed separately. Live RFL weekly results, Player Values and PDF opening were also verified without browser errors. The exported two-page report was rendered and visually checked.
+
+## Shared free-tier Firebase AI connection
+
+Supersedes the initial visitor-key deployment above. The advisor now uses Firebase AI Logic with Gemini Developer API (`gemini-3.1-flash-lite`) on project `rfl-agent`, verified without linked billing. Web app registration, reCAPTCHA Enterprise, App Check enforcement and HTTP-referrer restrictions are configured. No personal key is required and quota failures never trigger a paid fallback. A real Google response was verified; see `firebase-ai-free-tier.md` for configuration and test evidence.

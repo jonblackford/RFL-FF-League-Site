@@ -37,7 +37,7 @@ Fantasy-Intelligence's `app/core/evidence-semantics.js`, `value-calibration-guar
 - Weekly reports calculate from the chosen imported week rather than an unavailable AI backend. Notes are isolated by provider, league, season and week. Copy, text and image export work locally.
 - **Save PDF / print** opens a dedicated printable report. Choose **Save as PDF** in the native print dialog. It includes score comparisons, matchup results, awards, player performances, notes, league/season/week and creation time. No PDF service or upload is involved.
 - Player Values includes every rostered player and labels its index as recorded production, not a proprietary price or forecast. Historical scoring already reflects imported league rules. Byes/zeroes included in recorded roster weeks affect the average; sample coverage is explicit. Missing history is not a zero-value conclusion.
-- Optional AI still uses the visitor's in-memory Gemini key. No paid plan is activated and no shared key is embedded. External model quotas remain external.
+- Optional AI now uses Firebase AI Logic on the unbilled `rfl-agent` project. Visitors do not need their own Gemini key. App Check is enforced; no paid fallback or provider secret is embedded. Free quotas still apply.
 
 ## Verification boundaries
 
