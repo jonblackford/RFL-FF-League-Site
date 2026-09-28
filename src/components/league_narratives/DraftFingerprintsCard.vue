@@ -3,11 +3,6 @@ import { LockKeyhole } from "@lucide/vue";
 import { computed, ref, watch } from "vue";
 
 import type { ManagerArchetype } from "@/lib/narratives";
-import {
-  getLeagueAnalyticsProperties,
-  trackPremiumJourneyStep,
-} from "@/lib/analytics";
-import { useStore } from "@/store/store";
 import Card from "@/components/ui/card/Card.vue";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import FreeDraftFeatures from "./FreeDraftFeatures.vue";
@@ -27,7 +22,6 @@ const props = withDefaults(
   }>(),
   { isPremium: false }
 );
-const store = useStore();
 const isAuction = computed(() => props.draftType?.toLowerCase() === "auction");
 
 const hasDraftHistory = computed(() =>
@@ -88,16 +82,7 @@ const showPremiumSubscriptionCta = computed(
     !props.isPremium
 );
 
-const trackPremiumSubscriptionClick = () => {
-  trackPremiumJourneyStep("premium_cta_clicked", {
-    cta: "unlock_draft_room_scouting",
-    feature: "draft_room",
-    source: "draft_room_locked_preview",
-    preview_type: "personalized_history",
-    ...getLeagueAnalyticsProperties(store.currentLeague),
-  });
-  store.currentTab = "";
-};
+
 
 watch(
   () => props.isPremium,
@@ -142,20 +127,7 @@ watch(
             {{ activeDescription }}
             <template v-if="showPremiumSubscriptionCta">
               Available with a
-              <router-link
-                :to="{
-                  path: '/account',
-                  query: {
-                    ...$route.query,
-                    intent: 'draft_room',
-                    upgrade_source: 'draft_room_locked_preview',
-                  },
-                }"
-                class="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                @click="trackPremiumSubscriptionClick"
-              >
-                Premium subscription</router-link
-              >.
+              .
             </template>
           </p>
         </div>

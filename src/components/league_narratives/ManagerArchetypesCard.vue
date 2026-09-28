@@ -9,11 +9,7 @@ import Separator from "../ui/separator/Separator.vue";
 import { useSubscriptionStore } from "@/store/subscription.ts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  getLeagueAnalyticsProperties,
-  trackEvent,
-  trackPremiumJourneyStep,
-} from "@/lib/analytics";
+import { getLeagueAnalyticsProperties, trackEvent } from "@/lib/analytics";
 
 const store = useStore();
 const subscriptionStore = useSubscriptionStore();
@@ -461,28 +457,7 @@ watch(
           "
           class="flex justify-center mt-3"
         >
-          <Button size="sm" as-child>
-            <router-link
-              :to="{
-                path: '/account',
-                query: {
-                  ...$route.query,
-                  intent: 'manager_profiles',
-                  upgrade_source: 'manager_profiles',
-                },
-              }"
-              @click="
-                trackPremiumJourneyStep('premium_cta_clicked', {
-                  cta: 'unlock_all_manager_profiles',
-                  feature: 'manager_profiles',
-                  source: 'manager_profiles',
-                });
-                store.currentTab = '';
-              "
-            >
-              Unlock All Manager Profiles
-            </router-link>
-          </Button>
+
         </div>
         <p
           class="my-4 text-sm leading-relaxed text-muted-foreground"

@@ -20,11 +20,6 @@ import {
 } from "./lib/analytics";
 
 const Home = () => import("./views/Home.vue");
-const About = () => import("./views/About.vue");
-const ChangelogPage = () => import("./views/Changelog.vue");
-const PrivacyPolicy = () => import("./views/PrivacyPolicy.vue");
-const Terms = () => import("./views/Terms.vue");
-const Account = () => import("./views/Account.vue");
 const SharedReport = () => import("./views/SharedReport.vue");
 const SeoLanding = () => import("./views/SeoLanding.vue");
 const EspnLeagueAnalyzer = () => import("./views/EspnLeagueAnalyzer.vue");
@@ -225,50 +220,13 @@ const routes = [
       standalone: true,
     },
   },
-  {
-    path: "/about",
-    component: About,
-    meta: {
-      title: "About | RFL Agent",
-      description:
-        "Learn about RFL Agent, a tool for analyzing fantasy football leagues.",
-    },
-  },
-  {
-    path: "/changelog",
-    component: ChangelogPage,
-    meta: {
-      title: "Changelog | RFL Agent",
-      description: "See the latest RFL Agent updates, features, and bug fixes",
-    },
-  },
-  {
-    path: "/privacy",
-    component: PrivacyPolicy,
-    meta: {
-      title: "Privacy Policy | RFL Agent",
-      description:
-        "Read the RFL Agent privacy policy and learn how league, account, billing, and generated media data are handled.",
-    },
-  },
-  {
-    path: "/terms",
-    component: Terms,
-    meta: {
-      title: "Terms of Service | RFL Agent",
-      description:
-        "Read the RFL Agent terms of service for league analysis, generated reports, sharing, and video recaps.",
-    },
-  },
-  {
-    path: "/account",
-    component: Account,
-    meta: {
-      title: "Account | RFL Agent",
-      description: "Manage your RFL Agent account and subscription settings.",
-      robots: "noindex, follow",
-    },
-  },
+  ...["/about", "/changelog", "/privacy", "/terms", "/account"].map((path) => ({
+    path,
+    redirect: (to: { query: import("vue-router").LocationQuery }) => ({
+      path: "/",
+      query: Object.fromEntries(Object.entries(to.query).filter(([key]) => ["leagueId", "espn", "season"].includes(key))),
+    }),
+  })),
   {
     path: "/report/:token",
     component: SharedReport,
@@ -363,15 +321,6 @@ subscriptionStore.initialize();
 router.beforeEach(async (to) => {
   if (!authStore.initialized) {
     await authStore.initialize();
-  }
-  if (to.path === "/account" && to.query.code && authStore.isAuthenticated) {
-    const { code: _authCode, ...query } = to.query;
-    return {
-      path: to.path,
-      query,
-      hash: to.hash,
-      replace: true,
-    };
   }
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     return { path: "/" };

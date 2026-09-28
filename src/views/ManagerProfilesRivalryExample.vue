@@ -10,24 +10,12 @@ import PublicPageShell from "@/components/seo/PublicPageShell.vue";
 import ManagerProfilesPreview from "@/components/seo/previews/ManagerProfilesPreview.vue";
 import RivalryReportPreview from "@/components/seo/previews/RivalryReportPreview.vue";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { trackPremiumJourneyStep } from "@/lib/analytics";
 
-const profileRoute = {
-  path: "/account",
-  query: {
-    intent: "manager_profiles",
-    upgrade_source: "manager_profiles_rivalry_example",
-  },
-};
 
-const rivalryRoute = {
-  path: "/account",
-  query: {
-    intent: "rivalry_report",
-    upgrade_source: "manager_profiles_rivalry_example",
-  },
-};
+
+
+
+
 
 const evidence = [
   {
@@ -73,16 +61,7 @@ const faqs = [
   },
 ];
 
-const trackUnlockClick = (feature: "manager_profiles" | "rivalry_report") => {
-  trackPremiumJourneyStep("premium_cta_clicked", {
-    cta:
-      feature === "manager_profiles"
-        ? "unlock_manager_profiles"
-        : "unlock_rivalry_reports",
-    feature,
-    source: "manager_profiles_rivalry_example",
-  });
-};
+
 </script>
 
 <template>
@@ -109,14 +88,7 @@ const trackUnlockClick = (feature: "manager_profiles" | "rivalry_report") => {
               numbers still visible beside the story.
             </p>
             <div class="flex flex-wrap gap-3 mt-8">
-              <Button as-child size="lg">
-                <RouterLink
-                  :to="profileRoute"
-                  @click="trackUnlockClick('manager_profiles')"
-                >
-                  Unlock manager profiles
-                </RouterLink>
-              </Button>
+
               <Button as-child size="lg" variant="outline">
                 <a href="#rivalry-report">See rivalry report</a>
               </Button>
@@ -185,14 +157,7 @@ const trackUnlockClick = (feature: "manager_profiles" | "rivalry_report") => {
               rivalry breaks the pattern, and which bragging rights still
               survive the larger sample.
             </p>
-            <Button as-child class="mt-7">
-              <RouterLink
-                :to="rivalryRoute"
-                @click="trackUnlockClick('rivalry_report')"
-              >
-                Unlock rivalry reports
-              </RouterLink>
-            </Button>
+
           </div>
 
           <RivalryReportPreview />
@@ -237,19 +202,7 @@ const trackUnlockClick = (feature: "manager_profiles" | "rivalry_report") => {
               Sleeper and ESPN league you manage.
             </p>
           </div>
-          <Button
-            as-child
-            size="lg"
-            variant="secondary"
-            class="relative shrink-0"
-          >
-            <RouterLink
-              :to="profileRoute"
-              @click="trackUnlockClick('manager_profiles')"
-            >
-              Explore Premium
-            </RouterLink>
-          </Button>
+
         </div>
       </section>
     </article>

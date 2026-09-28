@@ -47,10 +47,6 @@ import {
   loadDemoStartSit,
   type DemoLeagueFixtures,
 } from "@/data/demo/loaders";
-import {
-  getLeagueAnalyticsProperties,
-  trackPremiumJourneyStep,
-} from "@/lib/analytics";
 
 type StartSitPlayer = {
   name?: string;
@@ -258,14 +254,7 @@ const lineupSummaryMetrics = computed(() => {
   ];
 });
 
-const trackValuesUpgradeClick = () => {
-  trackPremiumJourneyStep("premium_cta_clicked", {
-    feature: "start_sit",
-    cta: "add_player_value_context",
-    source: "start_sit_lineup_check",
-    ...getLeagueAnalyticsProperties(store.currentLeague),
-  });
-};
+
 
 const rosterNews = computed(() =>
   buildRosterNews(
@@ -853,26 +842,7 @@ watch(
                     additional context.
                   </template>
                 </p>
-                <Button
-                  v-if="valueAccess === 'preview' && !valuesLoading"
-                  as-child
-                  size="sm"
-                  class="mt-3"
-                >
-                  <router-link
-                    :to="{
-                      path: '/account',
-                      query: {
-                        ...$route.query,
-                        intent: 'player_values',
-                        upgrade_source: 'start_sit_lineup_check',
-                      },
-                    }"
-                    @click="trackValuesUpgradeClick"
-                  >
-                    Unlock Premium context
-                  </router-link>
-                </Button>
+
               </section>
             </aside>
             <div class="w-full min-w-0 xl:col-start-1 xl:row-start-1">

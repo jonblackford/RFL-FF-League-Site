@@ -17,7 +17,7 @@ import {
 } from "@/api/api";
 import { Button } from "@/components/ui/button";
 import { useSubscriptionStore } from "@/store/subscription";
-import { trackPremiumJourneyStep } from "@/lib/analytics";
+
 import { renderMarkdown } from "@/lib/markdown";
 import { getChartTheme, getChartTooltipTheme } from "@/lib/chartTheme";
 import { getRivalryReportPairKey } from "@/lib/rivalryReport";
@@ -953,28 +953,7 @@ const chartOptions = ref({
             class="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-background via-background/95 to-transparent"
           ></div>
           <div class="absolute inset-x-0 z-10 flex justify-center bottom-5">
-            <Button class="mt-4" as-child>
-              <router-link
-                :to="{
-                  path: '/account',
-                  query: {
-                    ...$route.query,
-                    intent: 'rivalry_report',
-                    upgrade_source: 'manager_comparison',
-                  },
-                }"
-                @click="
-                  trackPremiumJourneyStep('premium_cta_clicked', {
-                    cta: 'unlock_rivalry_reports',
-                    feature: 'rivalry_report',
-                    source: 'manager_comparison',
-                  });
-                  store.currentTab = '';
-                "
-              >
-                Unlock Rivalry Reports
-              </router-link>
-            </Button>
+
           </div>
         </div>
       </div>

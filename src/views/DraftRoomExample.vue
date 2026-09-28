@@ -2,24 +2,12 @@
 import DraftRoomSample from "@/components/league_narratives/DraftRoomSample.vue";
 import PublicPageShell from "@/components/seo/PublicPageShell.vue";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { trackPremiumJourneyStep } from "@/lib/analytics";
 
-const premiumRoute = {
-  path: "/account",
-  query: {
-    intent: "draft_room",
-    upgrade_source: "draft_room_example",
-  },
-};
 
-const trackUnlockClick = () => {
-  trackPremiumJourneyStep("premium_cta_clicked", {
-    cta: "explore_premium",
-    feature: "draft_room",
-    source: "draft_room_example",
-  });
-};
+
+
+
+
 
 </script>
 
@@ -55,11 +43,7 @@ const trackUnlockClick = () => {
               league you manage.
             </p>
           </div>
-          <Button as-child class="shrink-0">
-            <RouterLink :to="premiumRoute" @click="trackUnlockClick">
-              Explore Premium
-            </RouterLink>
-          </Button>
+
         </div>
       </section>
     </article>

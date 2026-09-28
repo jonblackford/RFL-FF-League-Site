@@ -74,14 +74,7 @@ import logoUrl from "@/assets/logo.webp";
             <RouterLink class="hover:text-foreground" to="/fantasy-football-weekly-recap">Weekly recaps</RouterLink>
           </div>
         </nav>
-        <nav aria-label="Footer navigation">
-          <p class="font-medium">Company</p>
-          <div class="grid gap-2 mt-3 text-muted-foreground">
-            <RouterLink class="hover:text-foreground" to="/about">About</RouterLink>
-            <RouterLink class="hover:text-foreground" to="/privacy">Privacy</RouterLink>
-            <RouterLink class="hover:text-foreground" to="/terms">Terms</RouterLink>
-          </div>
-        </nav>
+
       </div>
     </footer>
   </div>

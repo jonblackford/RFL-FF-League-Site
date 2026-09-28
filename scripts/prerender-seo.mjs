@@ -276,8 +276,8 @@ const pages = [
     introduction:
       "A complete Premium Draft Room sample built from several seasons of manager draft tendencies and adjusted to one team and snake-draft slot.",
     sectionHeading: "What the Draft Room sample shows",
-    ctaHref: "/account?intent=draft_room&upgrade_source=draft_room_example",
-    ctaLabel: "Explore RFL Agent Premium",
+    ctaHref: "/",
+    ctaLabel: "Open league analyzer",
     sections: [
       {
         title: "Round-by-round positional plan",
@@ -307,8 +307,8 @@ const pages = [
       "See how several seasons of league history become a distinct profile for every manager, then a personalized rivalry story for any two league mates.",
     sectionHeading: "What manager profiles and rivalry reports show",
     ctaHref:
-      "/account?intent=manager_profiles&upgrade_source=manager_profiles_rivalry_example",
-    ctaLabel: "Explore RFL Agent Premium",
+      "/",
+    ctaLabel: "Open league analyzer",
     sections: [
       {
         title: "Career manager profiles",

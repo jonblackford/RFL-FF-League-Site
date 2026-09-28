@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+
 import DraftRoomSample from "@/components/league_narratives/DraftRoomSample.vue";
 import type { ManagerArchetype } from "@/lib/narratives";
 import {
@@ -136,11 +136,7 @@ const historyHeading = computed(
     `Scout how your league actually ${props.isAuction ? "bids" : "drafts"}`
 );
 
-const unlockLabel = computed(() =>
-  props.isAuction
-    ? "Unlock Auction Draft Room"
-    : "Unlock Draft Room Scouting"
-);
+
 
 const analyticsProperties = () => ({
   feature: "draft_room",
@@ -155,13 +151,7 @@ usePaywallViewTracking(paywallElement, () => {
   trackPremiumJourneyStep("paywall_viewed", analyticsProperties());
 });
 
-const trackUnlockClick = () => {
-  trackPremiumJourneyStep("premium_cta_clicked", {
-    ...analyticsProperties(),
-    cta: "unlock_draft_room_scouting",
-  });
-  store.currentTab = "";
-};
+
 </script>
 
 <template>
@@ -355,21 +345,7 @@ const trackUnlockClick = () => {
           {{ previewCopy.description }}
         </p>
       </div>
-      <Button as-child class="shrink-0" size="lg">
-        <router-link
-          :to="{
-            path: '/account',
-            query: {
-              ...$route.query,
-              intent: 'draft_room',
-              upgrade_source: 'draft_room_locked_preview',
-            },
-          }"
-          @click="trackUnlockClick"
-        >
-          {{ unlockLabel }}
-        </router-link>
-      </Button>
+
     </div>
   </div>
 </template>

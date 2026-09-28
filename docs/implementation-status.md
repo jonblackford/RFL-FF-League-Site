@@ -19,3 +19,7 @@ The independent review identified storage denial, enrichment remount and route-q
 Sleeper supports the new custom-scored advisor. ESPN retains its existing analytics with explicit advisor availability messaging. Watchlists persist locally; conversations and provider keys last only for the current visit. Missing projections, unverified locks, historical estimates and stale records remain visible. Source projects are integrated selectively as capabilities and data contracts, not copied wholesale; see `data-sources.md` and the approved integration map.
 
 No paid billing, hosting upgrade, or fantasy transaction was activated. A live Gemini request succeeded; provider quotas remain external. Deployment status is verified separately against GitHub Actions and `version.json`.
+
+## Requested navigation cleanup
+
+Removed About, Changelog, Privacy Policy, Terms of Service and Account from the shipped routes/navigation. Removed footer links and account-only purchase CTAs. Old URLs redirect to the main site while preserving league/provider/season. No entitlement or paid backend authorization was bypassed.

@@ -168,26 +168,12 @@ test("persists the color theme across reloads", async ({ page }) => {
   await expect(page.locator("html")).toHaveClass(/dark/);
 });
 
-test("opens the local account forms without authentication", async ({ page }) => {
-  await page.goto("/account");
-
-  await expect(
-    page.getByRole("heading", { name: "Account", exact: true })
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", {
-      name: "Login to your account",
-      exact: true,
-    })
-  ).toBeVisible();
-
-  await page.getByRole("button", { name: "Sign up", exact: true }).click();
-
-  await expect(
-    page.getByText("Create an account", { exact: true })
-  ).toBeVisible();
-  await expect(page.getByLabel("Email", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
+test("removed information and account pages return to league tools", async ({ page }) => {
+  for (const path of ["about", "changelog", "privacy", "terms", "account"]) {
+    await page.goto(`/${path}`);
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.locator('a[href*="/account"],a[href*="/about"],a[href*="/changelog"],a[href*="/privacy"],a[href*="/terms"]')).toHaveCount(0);
+  }
 });
 
 test("rejects malformed shared-report links before making a request", async ({

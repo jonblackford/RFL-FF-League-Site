@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+
 import {
   Clapperboard,
   Copy,
@@ -70,18 +70,11 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
-const route = useRoute();
+
 const authStore = useAuthStore();
 const subscriptionStore = useSubscriptionStore();
 
-const premiumAccountRoute = computed(() => ({
-  path: "/account",
-  query: {
-    ...route.query,
-    intent: "premium_report",
-    upgrade_source: "weekly_report",
-  },
-}));
+
 
 const renderedWeeklyReport = computed(() =>
   renderMarkdown(props.rawWeeklyReport)
@@ -447,14 +440,7 @@ const trackVideoDownload = () => {
                 class="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-background via-background/95 to-transparent"
               ></div>
               <div class="absolute inset-x-0 z-10 flex justify-center bottom-6">
-                <Button as-child>
-                  <router-link
-                    :to="premiumAccountRoute"
-                    @click="trackPremiumCtaClick('unlock_premium_reports')"
-                  >
-                    Unlock Premium Reports
-                  </router-link>
-                </Button>
+
               </div>
             </div>
           </div>
@@ -495,14 +481,7 @@ const trackVideoDownload = () => {
               class="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-background via-background/95 to-transparent"
             ></div>
             <div class="absolute inset-x-0 z-10 flex justify-center bottom-6">
-              <Button as-child>
-                <router-link
-                  :to="premiumAccountRoute"
-                  @click="trackPremiumCtaClick('unlock_premium_reports')"
-                >
-                  Unlock Premium Reports
-                </router-link>
-              </Button>
+
             </div>
           </div>
         </div>

@@ -1,148 +1,68 @@
 # RFL Agent
 
-RFL Agent is a Vue/TypeScript fantasy football league analyzer for Sleeper and ESPN leagues. It transforms league, roster, matchup, draft, and transaction data into power rankings, playoff odds, reports, trade insights, and personalized season recaps.
+A Vue/TypeScript fantasy football workspace for Sleeper and ESPN leagues. Add a league, switch between saved leagues, and open **Advisor** for the integrated decision tools.
 
-![RFL Agent logo](public/logo.webp)
+## Features
 
-## Current Features
+- Sleeper advisor with team/week selection and live league-specific scoring.
+- Recommended lineups, waiver add/drop alternatives, player search, comparisons and local watchlists.
+- Historical usage from nflverse and DynastyProcess player-ID mappings, with source times and sample sizes.
+- Official weekly scores, completed league transactions and contextual weekly briefs.
+- Shared Gemini conversation panel with follow-ups and contextual lineup, player, waiver, trade and report questions.
+- Existing standings, power rankings, expected wins, playoffs, history, draft, manager and trade analysis.
+- Existing ESPN analytics; the new custom-scored optimizer currently supports Sleeper.
 
-- Comprehensive standings and AI-generated league news/current trends
-- Power rankings, roster rankings, and projections
-- Expected wins, strength of schedule (measuring luck), and schedule analysis
-- Roster management stats, trade rankings, Trade Finder, and waiver wire moves
-- Playoff odds
-- AI-generated weekly reports with matchup recaps, awards, top and bottom performers, customizable shared Premium reports, shareable images, and video recaps
-- Weekly matchup previews
-- Start/sit stats with latest player news
-- Draft grades, recap, and historical manager tendencies
-- Draft plans and league-mate scouting based on league draft history
-- Schedule simulator and trade calculator
-- Manager profiles highlighting tendencies, strengths, and overall identity
-- League history stats
-- Yearly Spotify Wrapped-style presentation
+The About, Changelog, Privacy Policy, Terms and Account pages and their navigation links are removed. Existing URLs return to the main site while preserving league selection. Legacy paid service integrations are not enabled or bypassed by this change.
 
-## Contributing
+## Run locally
 
-### Project Structure
-
-```text
-src/
-  api/          API clients and data transforms
-  components/   Feature and shared UI components
-  composables/  Reusable view logic
-  lib/          App utilities, auth helpers, and integrations
-  store/        Pinia stores
-  types/        Shared TypeScript types
-  views/        Route-level pages
-
-test/           Vitest coverage
-```
-
-### Getting Started
-
-To run the project locally, you'll need Node.js and npm installed.
-
-```bash
-  npm install
-  npm run dev
-```
-
-No environment variables are required for the static league analyzer and Trade Finder. Features that call private backend APIs, such as AI-generated summaries, account billing, and shared report generation, require additional backend configuration.
-
-### GitHub Pages
-
-This fork includes a GitHub Actions workflow at `.github/workflows/deploy-pages.yml`.
-
-1. Push the project to a GitHub repository.
-2. In GitHub, open Settings > Pages.
-3. Set Source to GitHub Actions.
-4. Push to `main` or run the workflow manually.
-
-The Pages build uses relative asset paths and hash routing so teammates can open the app from a repository Pages URL.
-
-### Technologies
-
-- Frontend: Vue 3, TypeScript, Vite
-- State management: Pinia
-- UI: Tailwind CSS, shadcn-vue
-- Optional backend integrations: Node.js, Supabase, Stripe, Resend, OpenAI
-- Analytics: PostHog, Umami
-- Testing: Vitest
-- Deployment: GitHub Pages or Vercel
-
-## Acknowledgements
-
-- [Sleeper API](https://docs.sleeper.com/)
-- [Avatars](https://getavataaars.com/)
-
-## Notes
-
-RFL Agent is an independent fantasy football tool and is not sponsored, endorsed, or operated by Sleeper, ESPN, the NFL, or their affiliates.
-
-## Dart Vader / RFL advisor
-
-The default entry opens `/rfl`, a dedicated advisor for **Dart Vader** in Sleeper league **1394364555710181376**. Existing league analytics remain available through the **League analytics** link; existing URLs with league query parameters still work.
-
-The advisor imports live league scoring and roster rules, scores raw weekly projections, assigns players to eligible starting slots (including superflex), and compares available add/drop alternatives against this roster. Expand a player for category-level scoring and coverage. Waiver suggestions are alternatives, not a sequence of transactions. The site does not submit lineups or claims.
-
-### Run locally
-
-Requires Node 24+ for the small local TypeScript API runner (the frontend retains its existing runtime requirements).
+Use Node 24+ and npm:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Calculated recommendations need no AI key. To enable actual AI explanations, copy `.env.example` to `.env.local`, configure the server-only values, then run a second terminal:
+Calculated league analysis needs no AI credential. Open **Ask advisor → Connect Gemini AI** to enter your Google AI Studio key. It stays in memory for the current visit and is sent directly to Google, not saved by the app. The model ID is configurable. Use a provider project without billing for a free setup; model availability and quotas are external. Provider failures leave calculated advice available.
 
-```bash
-npm run dev:api
-```
+Conversations are isolated by provider, league, team, season and week. Answers retain their snapshot timestamp. Watchlists and saved league preferences persist on the device, not across devices. No lineup, trade or waiver transaction is submitted by this site.
 
-- `GEMINI_API_KEY`: your Google AI Studio API key; never put this in a `VITE_` variable or the browser.
-- `GEMINI_MODEL`: defaults to `gemini-3-flash-preview`; configurable as provider availability changes.
+The existing `/api/rfl-advisor` endpoint remains a separately protected private RFL endpoint, not the public multi-league chat backend. To run that optional endpoint locally, configure server-only values from `.env.example` in `.env.local`, then run `npm run dev:api`. Never put provider keys in `VITE_` variables or commit environment files.
 
-The Vite development server proxies `/api/rfl-advisor` to the local API on port 3001. The default model has a free tier in the [Gemini pricing documentation](https://ai.google.dev/gemini-api/docs/pricing), subject to provider limits, regional eligibility, and model changes. Keep the Google project on its free tier if you want no inference charges; application code cannot enforce your provider billing settings. Free-tier inputs may be used by Google to improve products under its terms. The app sends a compact roster/scoring snapshot and your question, not the full player directory.
+## GitHub and hosting
 
-### Hosting
+Main-branch pushes deploy to GitHub Pages after unit, Python, build and browser checks. The same workflow refreshes historical usage daily at 10:20 UTC, subject to GitHub scheduling. It deploys validated data in the same run, so token-authored commits do not depend on triggering another workflow. Failed refreshes retain the previous committed feed and its original timestamp. `/version.json` identifies the deployed source commit.
 
-On Vercel, configure the same server environment variables and deploy the existing project normally. `api/rfl-advisor.ts` provides the AI endpoint; `/rfl` is rewritten to the SPA. Nothing is deployed automatically by this change. Restrict access to your private instance and keep provider quota limits in place. The endpoint requires the private token, caps requests and output, caches identical requests for five minutes, and allows five uncached calls per minute **per server instance**. The in-memory limit is not a global spending cap across serverless instances.
+See [deployment](docs/deployment.md), [data sources](docs/data-sources.md), and [implementation decisions](docs/implementation-status.md). No paid plan, provider billing or domain purchase is required or activated.
 
-GitHub Pages supports calculated advice using the existing hash router. It cannot run the serverless endpoint. For AI on GitHub Pages, expand **Connect Gemini AI** in the advisor and enter your own Google AI Studio API key. The browser sends that key directly to Google and keeps it only in memory for the current tab; it is not sent to this project or stored by the app. Use a restricted key and keep billing disabled if you want a free setup. This bring-your-own-key mode does not hide the key from the browser or other software running on the device.
+## Data limits
 
-### Data limits
+Sleeper is authoritative for league settings, ownership and official matchup totals. The raw projection/stat endpoints are undocumented and can change. Missing projected scoring categories are shown explicitly; available-stat totals do not imply complete forecasts. Historical return estimates are labeled and do not establish next week's role. Kicker buckets that cannot be split reliably remain missing. Game locks and immediate claim eligibility must be checked in Sleeper.
 
-- Sleeper `/v1` supplies league, roster and player metadata; the weekly raw-stat feed uses `api.sleeper.app/projections/nfl/...`. These projection/stat endpoints are not part of the documented public `/v1` contract and may change.
-- Missing projected categories are displayed, not silently treated as zero. The displayed total is an **available-stat total**, not a claim of complete projection coverage. Generic `pts_ppr` values are not used by this advisor.
-- Individual kick-return projections are absent in the inspected feed. `def_kr_yd` is deliberately not assumed to mean individual `kr_yd`. When at least two recent active-game records and recorded return-yard evidence exist, individual returns can use a separately labeled historical estimate. This does not verify next week's return role.
-- The inspected kicker feed combines 50+ field goals; RFL distinguishes 50–59 and 60+. Those unsplittable categories remain missing, which can materially understate kicker totals. Compare coverage before acting on kicker recommendations.
-- Injury status comes from Sleeper, not a separate real-time news service. Kickoff locks and immediate claim eligibility are unverified. Reserve-inclusive position cap checks are conservative. Unprojected/unavailable players are not suggested as drops.
-- Week changes use current roster ownership. Refresh failures retain the prior snapshot with a stale-data warning. Player metadata is cached in memory for 24 hours, weekly data for five minutes; refreshed projections also carry player metadata.
-- Existing general league analytics are retained; the new advisor is the custom-scored decision surface. Legacy analysis pages may still use their original standard/PPR calculations.
+Historical usage uses up to three recorded games before the selected week. Ambiguous player-ID mappings are excluded; unavailable stats remain null. Changing the analysis week uses current roster ownership. Existing legacy analytics may use standard/PPR estimates; custom-scored advisor projections are identified separately.
 
-### Verification
+## Verification
 
 ```bash
 npm test -- --run
+python3 -m unittest discover -s test -p 'test_data_refresh.py'
 npm run build
 npx playwright install chromium
-RUN_LIVE_TESTS=true npx playwright test e2e/rfl-advisor.spec.ts
+npx playwright test
 ```
 
-Unit discovery is scoped to this project's `test/` directory so the older nested `RFL FF League Site.` copy is not mixed into its imports. The advisor browser test uses live Sleeper data and therefore needs network access; it checks desktop/mobile layout, roster/waiver navigation, scoring rules, unavailable AI and stale refresh behavior. A live AI response requires your configured provider credential; mocked provider tests do not establish live activation.
-
-## Multi-league advisor
-
-Open **Advisor** in the league navigation after adding a Sleeper league. Choose a team and week to see custom-scored lineup recommendations, waiver alternatives, player search, comparisons and a local watchlist. Existing ESPN analytics remain available; the new custom-scored optimizer currently supports Sleeper.
-
-**Ask advisor** opens one shared conversation panel with contextual lineup, player, waiver, trade and weekly-report questions. Conversations are isolated by league/team/week and retained for the current visit; connect Gemini once per visit. Follow-up questions include bounded conversation history and current evidence. Old answers show their snapshot timestamp. No league transactions are submitted.
-
-Recent usage is built from nflverse weekly records and DynastyProcess player-ID mappings. Missing or ambiguous evidence remains unavailable. See [data sources](docs/data-sources.md) and [deployment](docs/deployment.md). Main-branch pushes deploy automatically after verification; the same workflow refreshes historical data daily. No paid hosting or provider billing is activated.
-
-Additional verification:
+Live-data verification is separate from deterministic CI:
 
 ```bash
-python3 -m unittest discover -s test -p 'test_data_refresh.py'
-npx playwright test e2e/multi-league-advisor.spec.ts e2e/league-lifecycle.spec.ts
+RUN_LIVE_TESTS=true npx playwright test e2e/rfl-advisor.spec.ts
+GITHUB_PAGES=true VITE_GITHUB_PAGES=true npm run build
+TEST_PAGES=true npx playwright test e2e/multi-league-advisor.spec.ts
 ```
+
+Refresh historical data manually with `python3 scripts/refresh-football-data.py`.
+
+## Source layout
+
+`src/features/advisor/` contains the integrated UI, conversation, usage and activity modules. `src/features/rfl/` retains the generalized scoring, optimizer and data adapters for compatibility. `src/store/advisor.ts` owns selected snapshot state. Existing analytics remain under `src/components/`. `scripts/refresh-football-data.py` generates compact historical data for the site.
+
+This independent tool is not sponsored or endorsed by Sleeper, ESPN, the NFL or their affiliates.

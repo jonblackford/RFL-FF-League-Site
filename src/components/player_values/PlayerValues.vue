@@ -158,12 +158,7 @@ usePaywallViewTracking(paywallElement, () => {
   trackPremiumJourneyStep("paywall_viewed", previewAnalyticsProperties());
 });
 
-const trackPreviewUpgradeClick = () => {
-  trackPremiumJourneyStep("premium_cta_clicked", {
-    ...previewAnalyticsProperties(),
-    cta: "unlock_complete_player_values",
-  });
-};
+
 
 onMounted(fetchPlayerValues);
 </script>
@@ -217,20 +212,7 @@ onMounted(fetchPlayerValues);
             access.
           </p>
         </div>
-        <router-link
-          :to="{
-            path: '/account',
-            query: {
-              ...$route.query,
-              intent: 'player_values',
-              upgrade_source: 'player_values_preview',
-            },
-          }"
-          class="inline-flex items-center justify-center h-10 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground shrink-0"
-          @click="trackPreviewUpgradeClick"
-        >
-          Unlock all {{ totalPlayers }} player values
-        </router-link>
+
       </div>
     </div>
   </Card>
