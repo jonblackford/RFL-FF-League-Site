@@ -1,50 +1,72 @@
 name: Deploy RFL Agent to GitHub Pages
-
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
-
+  schedule:
+    - cron: '20 10 * * *'
 permissions:
   contents: read
   pages: write
   id-token: write
-
 concurrency:
   group: pages
   cancel-in-progress: false
-
 jobs:
   build:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build static site
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm test -- --run
+      - run: python3 -m unittest discover -s test -p 'test_data_refresh.py'
+      - name: Refresh completed-game usage
+        id: refresh
+        continue-on-error: true
+        run: python3 scripts/refresh-football-data.py
+      - name: Record feed availability
+        if: steps.refresh.outcome == 'failure'
+        run: echo 'Usage refresh unavailable; retaining the last committed snapshot and its timestamp.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Build and verify site
         run: npm run build
         env:
-          GITHUB_PAGES: "true"
-          VITE_GITHUB_PAGES: "true"
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+          GITHUB_PAGES: 'true'
+          VITE_GITHUB_PAGES: 'true'
+      - run: npx playwright install --with-deps chromium
+      - name: Smoke-test Pages routing
+        run: npx playwright test e2e/multi-league-advisor.spec.ts
+        env:
+          TEST_PAGES: 'true'
+      - name: Save validated historical feed
+        if: steps.refresh.outcome == 'success'
+        run: |
+          git add public/data/football-*.json
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'Refresh verified football usage snapshot'
+            git push origin HEAD:main
+          fi
+      - name: Stamp deployed source
+        run: node -e "require('fs').writeFileSync('dist/version.json', JSON.stringify({commit:require('child_process').execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),builtAt:new Date().toISOString()}))"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
-
   deploy:
     environment:
       name: github-pages

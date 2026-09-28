@@ -1,0 +1,35 @@
+name: Verify site
+on:
+  pull_request:
+  push:
+    branches: [main, codex/multi-league-integration]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm test -- --run
+      - run: python3 -m unittest discover -s test -p 'test_data_refresh.py'
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test e2e/multi-league-advisor.spec.ts e2e/league-lifecycle.spec.ts
+      - name: Verify Pages build
+        run: npm run build
+        env:
+          GITHUB_PAGES: 'true'
+          VITE_GITHUB_PAGES: 'true'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-test-results
+          path: test-results/

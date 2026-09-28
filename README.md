@@ -131,3 +131,18 @@ npx playwright test e2e/rfl-advisor.spec.ts
 ```
 
 Unit discovery is scoped to this project's `test/` directory so the older nested `RFL FF League Site.` copy is not mixed into its imports. The advisor browser test uses live Sleeper data and therefore needs network access; it checks desktop/mobile layout, roster/waiver navigation, scoring rules, unavailable AI and stale refresh behavior. A live AI response requires your configured provider credential; mocked provider tests do not establish live activation.
+
+## Multi-league advisor
+
+Open **Advisor** in the league navigation after adding a Sleeper league. Choose a team and week to see custom-scored lineup recommendations, waiver alternatives, player search, comparisons and a local watchlist. Existing ESPN analytics remain available; the new custom-scored optimizer currently supports Sleeper.
+
+**Ask advisor** opens one shared conversation panel with contextual lineup, player, waiver, trade and weekly-report questions. Conversations are isolated by league/team/week and retained for the current visit; connect Gemini once per visit. Follow-up questions include bounded conversation history and current evidence. Old answers show their snapshot timestamp. No league transactions are submitted.
+
+Recent usage is built from nflverse weekly records and DynastyProcess player-ID mappings. Missing or ambiguous evidence remains unavailable. See [data sources](docs/data-sources.md) and [deployment](docs/deployment.md). Main-branch pushes deploy automatically after verification; the same workflow refreshes historical data daily. No paid hosting or provider billing is activated.
+
+Additional verification:
+
+```bash
+python3 -m unittest discover -s test -p 'test_data_refresh.py'
+npx playwright test e2e/multi-league-advisor.spec.ts e2e/league-lifecycle.spec.ts
+```

@@ -32,3 +32,12 @@ ios/
 # Playwright
 playwright-report/
 test-results/
+
+# Local implementation workspaces and source archives
+.worktrees/
+.superpowers/
+RFL FF League Site./
+*.zip
+__pycache__/
+.env.*
+!.env.example
