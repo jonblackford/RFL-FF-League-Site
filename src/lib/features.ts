@@ -1,5 +1,6 @@
 export const leagueFeatures = [
   { id: "Home" },
+  { id: "Advisor" },
   { id: "Standings" },
   { id: "Power Rankings" },
   { id: "Expected Wins" },

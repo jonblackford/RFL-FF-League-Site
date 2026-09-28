@@ -87,7 +87,7 @@ const importEspnLeague = async (page: Page) => {
 const getSavedLeagueKeys = (page: Page) =>
   page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("ffwrapped", 2);
+      const request = indexedDB.open("RFL Agent", 2);
       request.addEventListener("success", () => resolve(request.result), {
         once: true,
       });

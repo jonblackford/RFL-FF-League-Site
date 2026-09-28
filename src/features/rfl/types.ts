@@ -1,4 +1,9 @@
-export type AdvisorSelection = { provider: "sleeper"; leagueId: string; rosterId: number; week?: number };
+export type AdvisorSelection = {
+  provider: "sleeper";
+  leagueId: string;
+  rosterId: number;
+  week?: number;
+};
 export type Stats = Record<string, number>;
 export type Score = {
   total: number | null;

@@ -280,6 +280,7 @@ const rosterNews = computed(() =>
 );
 
 const advisorEvidence = computed<Record<string, unknown>>(() => ({
+  provider: store.currentLeague?.platform || "sleeper",
   leagueId: store.currentLeague?.leagueId ?? "demo-league",
   team: currentManager.value?.name ?? "Current roster",
   season: store.currentLeague?.season ?? "demo",
@@ -306,7 +307,7 @@ const advisorEvidence = computed<Record<string, unknown>>(() => ({
   waivers: [],
   news: rosterNews.value.slice(0, 10),
   warnings: [
-    "Use the displayed projections and news as decision support; verify injury status and lineup locks before kickoff.",
+    "These legacy projections may use standard/PPR totals rather than every custom scoring category. Do not describe them as complete custom-scored projections. Verify injury status and lineup locks before kickoff.",
   ],
 }));
 

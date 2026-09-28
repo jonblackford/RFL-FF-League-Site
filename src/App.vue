@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, watch, ref, computed, nextTick } from "vue";
+import AdvisorDrawer from "@/features/advisor/AdvisorDrawer.vue";
 import AppSidebar from "@/components/layout/AppSidebar.vue";
 import CardContainer from "./components/util/CardContainer.vue";
 import { getLeagueKey, useStore } from "./store/store";
@@ -228,6 +229,7 @@ const setHtmlBackground = () => {
         </SidebarInset>
       </SidebarProvider>
     </div>
+    <AdvisorDrawer />
     <Toaster />
   </div>
 </template>

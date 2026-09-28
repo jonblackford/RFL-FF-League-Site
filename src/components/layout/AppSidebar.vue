@@ -107,6 +107,7 @@ const changeTab = (tab: LeagueFeature) => {
   ) {
     router.replace({ path: "/", query: defaultRouteQuery.value });
   }
+  if (tab === "Advisor") router.replace({path:"/",query:{...defaultRouteQuery.value,destination:"advisor"}});
   store.currentTab = tab;
   localStorage.setItem("currentTab", tab);
   closeMobileSidebar();
@@ -114,6 +115,7 @@ const changeTab = (tab: LeagueFeature) => {
 
 const featureIcons: Record<LeagueFeature, Component> = {
   Home,
+  Advisor: FlaskConical,
   Standings: ChartColumn,
   "Power Rankings": ChartNoAxesCombined,
   "Expected Wins": TicketPercent,

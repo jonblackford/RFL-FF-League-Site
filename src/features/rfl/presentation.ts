@@ -40,7 +40,9 @@ export function buildEvidence(
   });
   return {
     leagueId: snapshot.league.league_id,
-    team: snapshot.roster.teamName || `Team ${snapshot.roster.roster_id ?? "unknown"}`,
+    team:
+      snapshot.roster.teamName ||
+      `Team ${snapshot.roster.roster_id ?? "unknown"}`,
     rosterId: snapshot.roster.roster_id,
     leagueName: snapshot.league.name,
     provider: "sleeper",

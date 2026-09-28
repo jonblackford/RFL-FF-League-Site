@@ -9,6 +9,7 @@ export const ESPN_LEAGUE_NAME = "ESPN League 2127";
 
 type LeagueApiControls = {
   sleeperLeagueName: string;
+  sleeperLeagueId: string;
   failSleeperRequests: boolean;
   failEspnRequests: boolean;
   sleeperLeagueRequests: number;
@@ -22,11 +23,11 @@ const jsonResponse = (route: Route, body: unknown, status = 200) =>
     body: JSON.stringify(body),
   });
 
-const sleeperLeagueResponse = (name: string) => ({
+const sleeperLeagueResponse = (name: string, leagueId = SLEEPER_LEAGUE_ID) => ({
   name,
   total_rosters: 2,
   season: ESPN_SEASON,
-  league_id: SLEEPER_LEAGUE_ID,
+  league_id: leagueId,
   previous_league_id: null,
   status: "pre_draft",
   sport: "nfl",
@@ -228,7 +229,7 @@ const handleSleeperRequest = async (
   const url = new URL(route.request().url());
   const path = url.pathname;
 
-  if (!path.includes(`/league/${SLEEPER_LEAGUE_ID}`)) {
+  if (!path.includes(`/league/${controls.sleeperLeagueId}`)) {
     await route.continue();
     return;
   }
@@ -238,11 +239,11 @@ const handleSleeperRequest = async (
     return;
   }
 
-  if (path === `/v1/league/${SLEEPER_LEAGUE_ID}`) {
+  if (path === `/v1/league/${controls.sleeperLeagueId}`) {
     controls.sleeperLeagueRequests += 1;
     await jsonResponse(
       route,
-      sleeperLeagueResponse(controls.sleeperLeagueName)
+      sleeperLeagueResponse(controls.sleeperLeagueName, controls.sleeperLeagueId)
     );
     return;
   }
@@ -313,10 +314,12 @@ const handleEspnRequest = async (
 };
 
 export const installLeagueApiMocks = async (
-  page: Page
+  page: Page,
+  leagueId = SLEEPER_LEAGUE_ID
 ): Promise<LeagueApiControls> => {
   const controls: LeagueApiControls = {
-    sleeperLeagueName: SLEEPER_LEAGUE_NAME,
+    sleeperLeagueName: leagueId === SLEEPER_LEAGUE_ID ? SLEEPER_LEAGUE_NAME : `Sleeper League ${leagueId}`,
+    sleeperLeagueId: leagueId,
     failSleeperRequests: false,
     failEspnRequests: false,
     sleeperLeagueRequests: 0,

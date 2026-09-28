@@ -17,3 +17,7 @@ describe("league feature destinations", () => {
     expect(getLeagueFeatureDestinationTab(undefined)).toBeNull();
   });
 });
+
+test('opens the advisor from a shareable destination', () => {
+  expect(getLeagueFeatureDestinationTab('advisor')).toBe('Advisor');
+});

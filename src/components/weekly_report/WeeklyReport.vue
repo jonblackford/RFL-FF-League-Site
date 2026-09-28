@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { openAdvisor } from "@/features/advisor/aiSession";
 import {
   TableDataType,
   LeagueInfoType,
@@ -1134,6 +1135,7 @@ onBeforeUnmount(() => {
     <Tabs default-value="Report" v-model="activeTab">
       <div class="flex justify-between w-full mb-3">
         <h2 class="mr-4 heading-section">Weekly {{ activeTab }}</h2>
+        <Button variant="outline" @click="openAdvisor('Explain the important results and patterns in this weekly league report. Only use the supplied evidence.', {provider:store.currentLeague?.platform || 'sleeper',leagueId:store.currentLeague?.leagueId,season:store.currentLeague?.season,week:currentWeek,team:'League report',fetchedAt:Date.now(),report:reportPrompt,warnings:['Distinguish recorded results from forecasts; do not invent unavailable news.']})">Ask advisor</Button>
         <div class="flex flex-wrap justify-end">
           <div class="inline-flex pb-1 rounded-lg sm:mr-2" role="tablist">
             <TabsList>

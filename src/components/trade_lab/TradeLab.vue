@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { openAdvisor } from "@/features/advisor/aiSession";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { TableDataType } from "../../types/types.ts";
@@ -830,6 +831,7 @@ onBeforeUnmount(() => {
   >
     <div class="flex flex-wrap items-start justify-between gap-3">
       <h2 class="heading-section">Trade Lab</h2>
+      <Button variant="outline" :disabled="!teamA || !teamB || isTradePackageEmpty" @click="openAdvisor('Explain this trade from both managers’ perspectives using the supplied values. Identify roster needs, uncertainty and limitations.', {provider:activeLeague?.platform || 'sleeper',leagueId:activeLeague?.leagueId,season:activeLeague?.season,week:selectedWeek,rosterId:selectedTeamAId,team:teamA?.managerName,fetchedAt:Date.now(),teamA: {name:teamA?.managerName,players:teamA?.players.filter(p=>teamASends.includes(p.player_id)),picks:teamAPicks,faab:teamAFaab},teamB:{name:teamB?.managerName,players:teamB?.players.filter(p=>teamBSends.includes(p.player_id)),picks:teamBPicks,faab:teamBFaab},quote:tradeQuote,warnings:['Trade values are estimates, not guaranteed outcomes. Verify roster and scoring coverage.']})">Ask advisor about trade</Button>
       <div class="flex flex-wrap items-center justify-end gap-2">
         <Tabs v-model="activeMode">
           <TabsList>

@@ -1,6 +1,7 @@
 import type { LeagueFeature } from "@/lib/features";
 
 export const leagueFeatureDestinations = [
+  "advisor",
   "player_values",
   "trade_finder",
 ] as const;
@@ -9,6 +10,7 @@ export type LeagueFeatureDestination =
   (typeof leagueFeatureDestinations)[number];
 
 const destinationTabs = {
+  advisor: "Advisor",
   player_values: "Player Values",
   trade_finder: "Trade Lab",
 } as const satisfies Record<LeagueFeatureDestination, LeagueFeature>;

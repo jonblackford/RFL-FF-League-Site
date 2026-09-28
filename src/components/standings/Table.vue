@@ -87,6 +87,7 @@ const CurrentTrends = defineAsyncComponent(() => import("./CurrentTrends.vue"));
 const ScheduleStrength = defineAsyncComponent(
   () => import("../expected_wins/ScheduleStrength.vue")
 );
+const AdvisorDashboard = defineAsyncComponent(() => import("@/features/advisor/AdvisorDashboard.vue"));
 const StartSitDashboard = defineAsyncComponent(
   () => import("../start_sit/StartSitDashboard.vue")
 );
@@ -330,6 +331,7 @@ const getTeamName = (tableDataItem: TableDataType) => {
 </script>
 <template>
   <div :class="['min-w-0', store.currentTab === 'Home' ? '' : 'mx-4']">
+    <AdvisorDashboard v-if="store.currentTab === 'Advisor'" />
     <PreviousSeasonPrompt v-if="showStandingsTab && store.currentLeagueId" />
     <div
       v-if="showStandingsTab"
