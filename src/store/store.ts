@@ -1,3 +1,4 @@
+import { preferenceStorage } from "@/lib/storage";
 import { defineStore } from "pinia";
 import {
   LeagueInfoType,
@@ -77,7 +78,7 @@ export const useStore = defineStore("main", {
     },
     updateShowUsernames(payload: boolean) {
       this.showUsernames = payload;
-      localStorage.setItem("showUsernames", JSON.stringify(payload));
+      preferenceStorage.setItem("showUsernames", JSON.stringify(payload));
     },
     isLeagueFeatureVisible(feature: LeagueFeature) {
       return !this.hiddenLeagueFeatures.includes(feature);
@@ -88,19 +89,19 @@ export const useStore = defineStore("main", {
       this.hiddenLeagueFeatures = visible
         ? this.hiddenLeagueFeatures.filter((item) => item !== feature)
         : [...new Set([...this.hiddenLeagueFeatures, feature])];
-      localStorage.setItem(
+      preferenceStorage.setItem(
         "hiddenLeagueFeatures",
         JSON.stringify(this.hiddenLeagueFeatures)
       );
 
       if (!visible && this.currentTab === feature) {
         this.currentTab = "Standings";
-        localStorage.setItem("currentTab", "Standings");
+        preferenceStorage.setItem("currentTab", "Standings");
       }
     },
     resetLeagueFeatureVisibility() {
       this.hiddenLeagueFeatures = [];
-      localStorage.removeItem("hiddenLeagueFeatures");
+      preferenceStorage.removeItem("hiddenLeagueFeatures");
     },
     updateLoadingUserLeagues(payload: boolean) {
       this.loadingUserLeagues = payload;

@@ -127,7 +127,7 @@ GitHub Pages supports calculated advice using the existing hash router. It canno
 npm test -- --run
 npm run build
 npx playwright install chromium
-npx playwright test e2e/rfl-advisor.spec.ts
+RUN_LIVE_TESTS=true npx playwright test e2e/rfl-advisor.spec.ts
 ```
 
 Unit discovery is scoped to this project's `test/` directory so the older nested `RFL FF League Site.` copy is not mixed into its imports. The advisor browser test uses live Sleeper data and therefore needs network access; it checks desktop/mobile layout, roster/waiver navigation, scoring rules, unavailable AI and stale refresh behavior. A live AI response requires your configured provider credential; mocked provider tests do not establish live activation.

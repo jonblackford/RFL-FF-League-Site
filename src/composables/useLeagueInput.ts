@@ -1,3 +1,4 @@
+import { preferenceStorage } from "@/lib/storage";
 import {
   computed,
   onBeforeUnmount,
@@ -137,7 +138,7 @@ export const useLeagueInput = (
   };
 
   onMounted(() => {
-    const savedInputType = localStorage.getItem("inputType");
+    const savedInputType = preferenceStorage.getItem("inputType");
     if (savedInputType) {
       inputType.value = savedInputType;
     }
@@ -145,7 +146,7 @@ export const useLeagueInput = (
 
   watch(
     () => inputType.value,
-    () => localStorage.setItem("inputType", inputType.value)
+    () => preferenceStorage.setItem("inputType", inputType.value)
   );
 
   const onSubmit = async () => {
@@ -162,7 +163,7 @@ export const useLeagueInput = (
     const openRequestedDestinationOrStandings = () => {
       const nextTab = requestedDestinationTab ?? "Standings";
       store.currentTab = nextTab;
-      localStorage.setItem("currentTab", nextTab);
+      preferenceStorage.setItem("currentTab", nextTab);
     };
     const attemptProperties: AnalyticsProperties = {
       source:
@@ -222,7 +223,7 @@ export const useLeagueInput = (
           store.username = user.display_name;
           store.setLeaguesList(leagues);
           store.updateShowLeaguesList(true);
-          localStorage.setItem("inputType", "League ID");
+          preferenceStorage.setItem("inputType", "League ID");
           store.updateShowInput(false);
           void inputUsername(user.display_name, submittedSeason);
           await resetRoute();

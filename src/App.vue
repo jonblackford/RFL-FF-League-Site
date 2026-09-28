@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { preferenceStorage } from "@/lib/storage";
 import { onMounted, watch, ref, computed, nextTick } from "vue";
 import AdvisorDrawer from "@/features/advisor/AdvisorDrawer.vue";
 import AppSidebar from "@/components/layout/AppSidebar.vue";
@@ -37,7 +38,7 @@ const trackFeatureView = createFeatureViewTracker();
 const systemDarkMode = window.matchMedia(
   "(prefers-color-scheme: dark)"
 ).matches;
-const savedDarkMode = localStorage.getItem("darkMode");
+const savedDarkMode = preferenceStorage.getItem("darkMode");
 // if savedDarkMode is null, use system preference
 // otherwise check if it is explicitly "true"
 const initialDarkMode =
@@ -52,7 +53,7 @@ const darkMode = computed(() => {
 });
 
 watch(clicked, () => {
-  localStorage.setItem("darkMode", String(clicked.value));
+  preferenceStorage.setItem("darkMode", String(clicked.value));
   store.updateDarkMode(clicked.value);
 });
 
@@ -68,9 +69,9 @@ watch(
   () => store.currentLeagueId,
   () => {
     if (store.currentLeagueId === "") {
-      localStorage.removeItem("currentLeagueId");
+      preferenceStorage.removeItem("currentLeagueId");
     } else {
-      localStorage.setItem("currentLeagueId", store.currentLeagueId);
+      preferenceStorage.setItem("currentLeagueId", store.currentLeagueId);
       if (
         store.currentTab === "Wrapped" &&
         store.currentLeague?.season !== "2025"
@@ -99,7 +100,7 @@ watch(
           });
         }
       } else {
-        localStorage.removeItem("currentLeagueId");
+        preferenceStorage.removeItem("currentLeagueId");
         toast.error("Error fetching data. Please try refreshing the page.");
       }
     }

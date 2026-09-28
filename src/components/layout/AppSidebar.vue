@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { preferenceStorage } from "@/lib/storage";
 import { computed, type Component } from "vue";
 import type { SidebarProps } from "@/components/ui/sidebar";
 import { useSidebar } from "@/components/ui/sidebar";
@@ -109,7 +110,7 @@ const changeTab = (tab: LeagueFeature) => {
   }
   if (tab === "Advisor") router.replace({path:"/",query:{...defaultRouteQuery.value,destination:"advisor"}});
   store.currentTab = tab;
-  localStorage.setItem("currentTab", tab);
+  preferenceStorage.setItem("currentTab", tab);
   closeMobileSidebar();
 };
 

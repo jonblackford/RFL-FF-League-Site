@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { preferenceStorage } from "@/lib/storage";
 import { maxBy, minBy } from "@/lib/collection";
 import { createTableData } from "../../api/helper";
 import {
@@ -145,12 +146,12 @@ const isActiveFeature = (feature: LeagueFeature) =>
   isLeagueFeatureAvailable(feature, seasonType.value);
 
 onMounted(() => {
-  const savedCurrentTab = localStorage.getItem("currentTab");
+  const savedCurrentTab = preferenceStorage.getItem("currentTab");
   if (savedCurrentTab) {
     const currentTab = normalizeLeagueFeature(savedCurrentTab);
     store.currentTab = currentTab;
     if (currentTab !== savedCurrentTab) {
-      localStorage.setItem("currentTab", currentTab);
+      preferenceStorage.setItem("currentTab", currentTab);
     }
   }
 

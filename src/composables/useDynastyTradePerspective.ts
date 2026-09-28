@@ -1,3 +1,4 @@
+import { preferenceStorage } from "@/lib/storage";
 import { ref, watch } from "vue";
 import type { DynastyPerspective } from "@/lib/tradeFinder";
 
@@ -10,7 +11,7 @@ const perspectives: DynastyPerspective[] = [
 
 const getInitialPerspective = (): DynastyPerspective => {
   if (typeof window === "undefined") return "balanced";
-  const saved = localStorage.getItem(storageKey) as DynastyPerspective | null;
+  const saved = preferenceStorage.getItem(storageKey) as DynastyPerspective | null;
   return saved && perspectives.includes(saved) ? saved : "balanced";
 };
 
@@ -20,7 +21,7 @@ const dynastyTradePerspective = ref<DynastyPerspective>(
 
 watch(dynastyTradePerspective, (perspective) => {
   if (typeof window !== "undefined") {
-    localStorage.setItem(storageKey, perspective);
+    preferenceStorage.setItem(storageKey, perspective);
   }
 });
 

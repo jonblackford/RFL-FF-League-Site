@@ -75,6 +75,17 @@ test("advisor connects team selection, comparisons, watchlists and AI on mobile"
   await page.getByRole("button", { name: "Ask advisor ↗" }).click();
   await expect(page.getByRole("alert")).toContainText("Connect your Gemini");
   await page.getByRole("button", { name: "Close advisor" }).click();
+  await page.getByText("Standings", { exact: true }).first().click();
+  await page.getByText("Advisor", { exact: true }).first().click();
+  await expect(
+    page.getByRole("heading", { name: "Recent usage" }),
+  ).toBeVisible();
+  await page
+    .getByRole("navigation", { name: "Advisor sections" })
+    .getByRole("button", { name: "Players", exact: true })
+    .click();
+  await page.getByLabel("Search players").fill("Alpha");
+  await page.getByRole("button", { name: "Compare", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(
     page.getByRole("heading", { name: "Player comparison" }),
@@ -168,16 +179,44 @@ test("saved leagues isolate team preferences and bounded AI conversations", asyn
   await expect(
     page.getByText("Grounded answer 1", { exact: true }),
   ).toHaveCount(0);
-  await expect(page.getByLabel("Gemini API key")).toHaveValue("");
+  await expect(page.getByLabel("Gemini API key")).toHaveValue(
+    process.env.TEST_PAGES === "true" ? "mock-key-not-real" : "",
+  );
   await page.getByRole("button", { name: "Close advisor" }).click();
   controls.sleeperLeagueId = SLEEPER_LEAGUE_ID;
   await page.goto(
     `${prefix}?leagueId=${SLEEPER_LEAGUE_ID}&destination=advisor`,
   );
   await expect(page.getByLabel("Team", { exact: true })).toHaveValue("2");
+  await page.goto(
+    `${prefix}?leagueId=${SLEEPER_LEAGUE_ID}&destination=advisor&team=1&week=4&advisor=Players`,
+  );
+  await expect(page.getByLabel("Team", { exact: true })).toHaveValue("1");
+  await expect(page.getByLabel("Week", { exact: true })).toHaveValue("4");
+  await expect(
+    page
+      .getByRole("navigation", { name: "Advisor sections" })
+      .getByRole("button", { name: "Players", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({
     path: "/tmp/rfl-advisor-desktop.png",
     fullPage: true,
   });
+});
+
+test("denied preference storage does not blank the app", async ({ page }) => {
+  await installLeagueApiMocks(page);
+  await page.addInitScript(() => {
+    Storage.prototype.getItem = () => {
+      throw new DOMException("Access denied", "SecurityError");
+    };
+    Storage.prototype.setItem = () => {
+      throw new DOMException("Access denied", "SecurityError");
+    };
+  });
+  await page.goto(process.env.TEST_PAGES === "true" ? "/#/" : "/");
+  await expect(
+    page.getByRole("heading", { name: /fantasy football/i }).first(),
+  ).toBeVisible();
 });

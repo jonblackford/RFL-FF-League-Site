@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { preferenceStorage } from "@/lib/storage";
 import {
   Check,
   ChevronsUpDown,
@@ -109,7 +110,7 @@ const removeLeague = () => {
     toast.success("League removed!");
     if (store.currentLeagueId === "") {
       void removeAllNarrativeBundles();
-      localStorage.removeItem("currentTab");
+      preferenceStorage.removeItem("currentTab");
       store.updateShowUsernames(false);
       store.currentTab = "Home";
       // reset url if there are no leagues

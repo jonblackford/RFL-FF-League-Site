@@ -93,7 +93,7 @@ test("restores a saved league from IndexedDB after a reload", async ({
       sport: "nfl",
     };
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("ffwrapped", 2);
+      const request = indexedDB.open("RFL Agent", 2);
       request.addEventListener("success", () => resolve(request.result), {
         once: true,
       });
@@ -212,7 +212,7 @@ test("serves standalone deep links from the production preview", async ({
     })
   ).toBeVisible();
   await expect(page).toHaveTitle(
-    "Fantasy Football Power Rankings for Your League | ffwrapped"
+    "Fantasy Football Power Rankings for Your League | RFL Agent"
   );
 });
 

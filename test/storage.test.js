@@ -24,7 +24,7 @@ describe("storage helpers", () => {
     const storage = createStorageMock({ flag: "true" });
 
     expect(
-      getParsedStorageItem("flag", false, { storage, isValid: isBoolean })
+      getParsedStorageItem("flag", false, { storage, isValid: isBoolean }),
     ).toBe(true);
   });
 
@@ -32,7 +32,7 @@ describe("storage helpers", () => {
     const storage = createStorageMock({ cache: "{bad-json" });
 
     expect(
-      getParsedStorageItem("cache", {}, { storage, isValid: isRecord })
+      getParsedStorageItem("cache", {}, { storage, isValid: isRecord }),
     ).toEqual({});
     expect(storage.removeItem).toHaveBeenCalledWith("cache");
   });
@@ -41,8 +41,20 @@ describe("storage helpers", () => {
     const storage = createStorageMock({ cache: "[]" });
 
     expect(
-      getParsedStorageItem("cache", {}, { storage, isValid: isRecord })
+      getParsedStorageItem("cache", {}, { storage, isValid: isRecord }),
     ).toEqual({});
     expect(storage.removeItem).toHaveBeenCalledWith("cache");
   });
+});
+
+test("denied preference storage falls back without preventing startup", () => {
+  const denied = {
+    getItem() {
+      throw new Error("Denied");
+    },
+    removeItem() {
+      throw new Error("Denied");
+    },
+  };
+  expect(getParsedStorageItem("theme", false, { storage: denied })).toBe(false);
 });

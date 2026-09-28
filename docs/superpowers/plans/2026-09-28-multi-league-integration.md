@@ -102,3 +102,8 @@
 ## Execution handoff
 
 Recommended method: native execution in this session, followed by one independent whole-change review. Tasks share the same snapshot, navigation and AI interfaces, so one implementer reduces coordination and merge overhead. This plan is ready for the required user review and execution-method selection; no implementation is claimed yet.
+
+
+## Execution record
+
+User approved native execution. Implementation and verification are recorded in `docs/implementation-status.md`; final GitHub deployment verification follows the reviewed commits.

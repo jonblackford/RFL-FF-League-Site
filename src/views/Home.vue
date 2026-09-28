@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { preferenceStorage } from "@/lib/storage";
 import {
   computed,
   defineAsyncComponent,
@@ -40,14 +41,11 @@ import {
   getLeagueLoadErrorMessage,
   isRequestCancellation,
 } from "@/lib/request";
-import {
-  loadDemoLeague,
-  type DemoLeagueFixtures,
-} from "@/data/demo/loaders";
+import { loadDemoLeague, type DemoLeagueFixtures } from "@/data/demo/loaders";
 import { getLeagueFeatureDestinationTab } from "@/lib/leagueFeatureDestination";
 
 const Table = defineAsyncComponent(
-  () => import("../components/standings/Table.vue")
+  () => import("../components/standings/Table.vue"),
 );
 
 const route = useRoute();
@@ -56,7 +54,7 @@ const store = useStore();
 
 const isInitialLoading = ref(true);
 const storageUnavailable = computed(
-  () => leaguePersistenceStatus.value === "blocked"
+  () => leaguePersistenceStatus.value === "blocked",
 );
 const homeInitializationRequests = createLatestRequestGuard();
 const cachedGoogleSitelinks = ["1218604624068497408", "1057743221285101568"];
@@ -72,11 +70,11 @@ watch(
     if (!currentLeagueId && !storageUnavailable.value) {
       void ensureDemoLeague();
     }
-  }
+  },
 );
 
 const systemDarkMode = window.matchMedia(
-  "(prefers-color-scheme: dark)"
+  "(prefers-color-scheme: dark)",
 ).matches;
 const clicked = ref(systemDarkMode);
 
@@ -105,15 +103,18 @@ const refreshSavedLeagues = async (savedLeagues: LeagueInfoType[]) => {
           refreshedLeague.totalRosters,
           refreshedLeague.seasonType,
           refreshedLeague.season,
-          refreshedLeague.platform === "espn" ? "espn" : "sleeper"
+          refreshedLeague.platform === "espn" ? "espn" : "sleeper",
         );
       });
     } catch (error) {
-      console.error(`Unable to refresh saved league ${league.leagueId}:`, error);
+      console.error(
+        `Unable to refresh saved league ${league.leagueId}:`,
+        error,
+      );
       toast.error(
         league.platform === "espn"
           ? getEspnErrorMessage(error)
-          : `${league.name}: ${getLeagueLoadErrorMessage(error)} Showing saved data.`
+          : `${league.name}: ${getLeagueLoadErrorMessage(error)} Showing saved data.`,
       );
     }
   });
@@ -137,18 +138,18 @@ const initializeHome = async () => {
     ? routeSnapshot.query.source[0]
     : routeSnapshot.query.source;
   const requestedDestinationTab = getLeagueFeatureDestinationTab(
-    routeSnapshot.query.destination
+    routeSnapshot.query.destination,
   );
   const openRequestedDestination = () => {
     if (!requestedDestinationTab || !store.currentLeagueId) return false;
     store.currentTab = requestedDestinationTab;
-    localStorage.setItem("currentTab", requestedDestinationTab);
+    preferenceStorage.setItem("currentTab", requestedDestinationTab);
     return true;
   };
   const openRequestedDestinationOrStandings = () => {
     if (openRequestedDestination()) return;
     store.currentTab = "Standings";
-    localStorage.setItem("currentTab", "Standings");
+    preferenceStorage.setItem("currentTab", "Standings");
   };
   const isInitializationActive = () =>
     homeInitializationRequests.isActive(controller);
@@ -166,7 +167,7 @@ const initializeHome = async () => {
       const recovered = await flushLeaguePersistence();
       if (!recovered) {
         throw new LeagueStorageUnavailableError(
-          new Error("Pending league changes could not be saved")
+          new Error("Pending league changes could not be saved"),
         );
       }
       if (!isInitializationActive()) return;
@@ -174,12 +175,12 @@ const initializeHome = async () => {
 
     if (!recoveringPendingChanges && savedLeagues.length > 0) {
       const leaguesToHydrate = savedLeagues.filter(
-        (league) => !store.leagueIds.includes(getLeagueKey(league))
+        (league) => !store.leagueIds.includes(getLeagueKey(league)),
       );
       leaguesToHydrate.forEach((league) => store.updateLeagueInfo(league));
       if (route.fullPath === routeSnapshot.fullPath && !leagueId) {
         store.updateCurrentLeagueId(
-          localStorage.getItem("currentLeagueId") ?? ""
+          preferenceStorage.getItem("currentLeagueId") ?? "",
         );
         openRequestedDestination();
       }
@@ -217,7 +218,7 @@ const initializeHome = async () => {
             season,
             leagueId,
             getSavedEspnAuth(season, leagueId),
-            { signal: controller.signal }
+            { signal: controller.signal },
           );
           if (!isActive()) return;
 
@@ -234,7 +235,7 @@ const initializeHome = async () => {
             league.totalRosters,
             league.seasonType,
             league.season,
-            "espn"
+            "espn",
           );
         } catch (error) {
           if (isRequestCancellation(error) || !isActive()) return;
@@ -260,7 +261,7 @@ const initializeHome = async () => {
           league.totalRosters,
           league.seasonType,
           league.season,
-          "sleeper"
+          "sleeper",
         );
         openRequestedDestinationOrStandings();
         trackEvent("League Added", {
@@ -272,7 +273,7 @@ const initializeHome = async () => {
         toast.error("Invalid League ID");
       }
     } else if (leagueId === "undefined") {
-      localStorage.removeItem("currentLeagueId");
+      preferenceStorage.removeItem("currentLeagueId");
       toast.error("Error fetching data. Please try refreshing the page.");
       // these leagues are somehow being cached in google sitelinks
     } else if (leagueId && cachedGoogleSitelinks.includes(leagueId)) {
@@ -280,11 +281,11 @@ const initializeHome = async () => {
       delete newQuery.leagueId;
       await router.replace({ path: routeSnapshot.path, query: newQuery });
       const savedCurrentLeagueId =
-        localStorage.getItem("currentLeagueId") ?? "";
+        preferenceStorage.getItem("currentLeagueId") ?? "";
       store.updateCurrentLeagueId(
         store.leagueIds.includes(savedCurrentLeagueId)
           ? savedCurrentLeagueId
-          : (store.leagueIds[0] ?? "")
+          : (store.leagueIds[0] ?? ""),
       );
     } else if (routeLeagueKey && store.leagueIds.includes(routeLeagueKey)) {
       store.updateCurrentLeagueId(routeLeagueKey);
@@ -300,7 +301,7 @@ const initializeHome = async () => {
     toast.error(
       routeIsEspnLeague
         ? getEspnErrorMessage(error)
-        : getLeagueLoadErrorMessage(error)
+        : getLeagueLoadErrorMessage(error),
     );
   } finally {
     if (homeInitializationRequests.finish(controller)) {
@@ -314,6 +315,19 @@ const initializeHome = async () => {
 };
 
 onMounted(initializeHome);
+// Hash routing can change the requested league without remounting Home.
+watch(
+  () => [route.query.leagueId, route.query.espn, route.query.season],
+  () => {
+    const id = Array.isArray(route.query.leagueId)
+      ? route.query.leagueId[0]
+      : route.query.leagueId;
+    if (!id) return;
+    const key =
+      "espn" in route.query ? `espn:${id}:${route.query.season ?? ""}` : id;
+    if (key !== store.currentLeagueId) void initializeHome();
+  },
+);
 
 onBeforeUnmount(() => {
   homeInitializationRequests.cancel();
@@ -321,7 +335,7 @@ onBeforeUnmount(() => {
 });
 
 const checkSystemTheme = () => {
-  const savedDarkMode = localStorage.getItem("darkMode");
+  const savedDarkMode = preferenceStorage.getItem("darkMode");
   if (systemDarkMode && savedDarkMode === null) {
     clicked.value = true;
     store.updateDarkMode(true);
@@ -343,9 +357,9 @@ const checkSystemTheme = () => {
       <div class="max-w-lg rounded-lg border bg-card p-6 text-center shadow-xs">
         <h1 class="text-xl font-semibold">Saved leagues are unavailable</h1>
         <p class="mt-2 text-sm text-muted-foreground">
-          We could not safely read your saved league data, so league changes
-          are paused to prevent data loss. Close any other open RFL Agent tabs,
-          then try again.
+          We could not safely read your saved league data, so league changes are
+          paused to prevent data loss. Close any other open RFL Agent tabs, then
+          try again.
         </p>
         <Button
           class="mt-4"
@@ -369,11 +383,7 @@ const checkSystemTheme = () => {
           <div v-if="store.showLeaguesList" class="container mx-auto">
             <UserLeagueList />
           </div>
-          <div
-            v-if="
-              store.currentLeague && !store.loadingUserLeagues
-            "
-          >
+          <div v-if="store.currentLeague && !store.loadingUserLeagues">
             <Table
               :users="store.currentLeague.users"
               :rosters="store.currentLeague.rosters"

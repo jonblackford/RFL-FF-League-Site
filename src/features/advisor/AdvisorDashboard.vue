@@ -78,21 +78,20 @@ watch(
           e instanceof Error ? e.message : "Usage unavailable";
     }
   },
+  { immediate: true },
 );
 const evidence = computed(() =>
   snapshot.value
     ? {
         ...buildEvidence(snapshot.value, lineup.value, waivers.value),
-        historicalUsage: mine.value
-          .slice(0, 30)
-          .map((p) => ({
-            id: p.id,
-            name: p.name,
-            trend: trendBeforeWeek(
-              enrichment.value?.players[p.id],
-              snapshot.value!.week,
-            ),
-          })),
+        historicalUsage: mine.value.slice(0, 30).map((p) => ({
+          id: p.id,
+          name: p.name,
+          trend: trendBeforeWeek(
+            enrichment.value?.players[p.id],
+            snapshot.value!.week,
+          ),
+        })),
         historicalFeedGeneratedAt: enrichment.value?.generatedAt,
         historicalFeedError: enrichmentError.value,
       }
@@ -206,6 +205,22 @@ async function changeSelection() {
   navigate(tab.value);
   await load();
 }
+watch(
+  () => [route.query.team, route.query.week, route.query.advisor],
+  () => {
+    if (String(route.query.leagueId) !== league.value?.leagueId) return;
+    const nextTeam = Number(route.query.team) || team.value;
+    const nextWeek = Number(route.query.week) || undefined;
+    const nextTab = String(route.query.advisor || "Overview");
+    if (tabs.includes(nextTab)) tab.value = nextTab;
+    if (nextTeam === team.value && nextWeek === week.value) return;
+    team.value = nextTeam;
+    week.value = nextWeek;
+    compared.value = [];
+    watchlist.value = readAdvisorPreferences(prefKey.value).watchlist;
+    void load();
+  },
+);
 function openLegacy(feature: string) {
   store.currentTab = feature;
   try {
