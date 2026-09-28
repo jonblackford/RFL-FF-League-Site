@@ -76,6 +76,9 @@ const Projections = defineAsyncComponent(
 const PlayoffPercentages = defineAsyncComponent(
   () => import("../playoffs/PlayoffPercentages.vue")
 );
+const WeeklyReport = defineAsyncComponent(
+  () => import("../weekly_report/WeeklyReport.vue")
+);
 const Draft = defineAsyncComponent(() => import("../draft/Draft.vue"));
 const TeamRanking = defineAsyncComponent(
   () => import("../power_rankings/TeamRanking.vue")
@@ -741,6 +744,16 @@ const getTeamName = (tableDataItem: TableDataType) => {
     <div class="w-full" v-if="store.currentTab === 'Playoffs'">
       <PlayoffPercentages :propsTableData="sortedPropsTableData" class="mt-4" />
       <Playoffs class="mb-4" :tableData="tableData" />
+    </div>
+    <div
+      v-if="isActiveFeature('Weekly Report')"
+    >
+      <WeeklyReport
+        v-if="store.currentLeagueId"
+        :tableData="tableData"
+        :regular-season-length="regularSeasonLength ? regularSeasonLength : 15"
+      />
+      <WeeklyReport v-else :tableData="tableData" :regular-season-length="15" />
     </div>
     <div
       v-if="isActiveFeature('Season Forecast')"

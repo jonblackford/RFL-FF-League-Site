@@ -12,17 +12,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getStats } from "@/api/sleeperApi";
 import type {
   DynastyPerspective,
   TradeFinderPlayer,
   TradeFinderRoster,
   TradeValuationMode,
 } from "@/lib/tradeFinder";
-import {
-  buildPlayerScoringReviewItems,
-  type PlayerPreviousSeasonStats,
-} from "@/lib/playerScoringReview";
 import {
   buildTradeValueExplanation,
   getTradeValueTierLabel,
@@ -36,7 +31,6 @@ const props = defineProps<{
   totalPlayers: number;
   season?: string;
   leagueLastUpdated?: number;
-  scoringType?: number;
 }>();
 
 const emit = defineEmits<{
@@ -51,9 +45,6 @@ const playerSearch = ref("");
 const selectedManagerId = ref("ALL");
 const selectedPosition = ref("ALL");
 const expandedPlayerId = ref<string | null>(null);
-const previousStatsByPlayerId = ref<
-  Record<string, PlayerPreviousSeasonStats | null | undefined>
->({});
 const currentPage = ref(1);
 const PAGE_SIZE = 25;
 
@@ -149,13 +140,6 @@ const valueContext = computed(() => {
   return `${seasonLabel}${modeLabel} · Refreshed ${refreshedAt}`;
 });
 
-const scoringLabel = computed(() => {
-  if (props.scoringType === 1) return "PPR";
-  if (props.scoringType === 0.5) return "Half PPR";
-  if (props.scoringType === 0) return "Standard";
-  return "League";
-});
-
 watch([playerSearch, selectedManagerId, selectedPosition], () => {
   currentPage.value = 1;
 });
@@ -207,58 +191,12 @@ const toggleValueExplanation = (playerId: string) => {
     expandedPlayerId.value === playerId ? null : playerId;
 };
 
-const loadPreviousStats = async (player: TradeFinderPlayer) => {
-  if (!props.season || previousStatsByPlayerId.value[player.playerId] !== undefined) {
-    return;
-  }
-
-  const previousSeason = String((Number(props.season) || 0) - 1);
-  if (!previousSeason || previousSeason === "-1") return;
-
-  previousStatsByPlayerId.value = {
-    ...previousStatsByPlayerId.value,
-    [player.playerId]: null,
-  };
-
-  const stats = await getStats(
-    player.playerId,
-    previousSeason,
-    props.scoringType ?? 1
-  );
-  previousStatsByPlayerId.value = {
-    ...previousStatsByPlayerId.value,
-    [player.playerId]: stats
-      ? {
-          points: Number(stats.points || 0),
-          ppg: Number(stats.ppg || 0),
-          rank: Number(stats.rank || 0),
-          position: stats.position || player.position,
-        }
-      : null,
-  };
-};
-
-watch(expandedPlayerId, (playerId) => {
-  const player = players.value.find((item) => item.playerId === playerId);
-  if (player) {
-    void loadPreviousStats(player);
-  }
-});
-
 const getValueExplanation = (player: TradeFinderPlayer) =>
   buildTradeValueExplanation({
     player,
     players: players.value,
     valuationMode: props.valuationMode,
     dynastyPerspective: dynastyPerspective.value,
-  });
-
-const getPlayerScoringReviewItems = (player: TradeFinderPlayer) =>
-  buildPlayerScoringReviewItems({
-    player,
-    valuationMode: props.valuationMode ?? "ros projection",
-    scoringLabel: scoringLabel.value,
-    previousStats: previousStatsByPlayerId.value[player.playerId] ?? null,
   });
 </script>
 
@@ -586,22 +524,6 @@ const getPlayerScoringReviewItems = (player: TradeFinderPlayer) =>
                         >
                         {{ getValueExplanation(player) }}
                       </p>
-                      <dl
-                        class="grid max-w-4xl grid-cols-1 gap-3 mt-3 text-xs sm:grid-cols-2 lg:grid-cols-4"
-                      >
-                        <div
-                          v-for="item in getPlayerScoringReviewItems(player)"
-                          :key="item.label"
-                          class="min-w-0"
-                        >
-                          <dt class="text-muted-foreground">
-                            {{ item.label }}
-                          </dt>
-                          <dd class="mt-0.5 font-medium text-foreground">
-                            {{ item.value }}
-                          </dd>
-                        </div>
-                      </dl>
                     </td>
                   </tr>
                 </template>
