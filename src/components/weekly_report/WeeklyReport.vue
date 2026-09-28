@@ -38,10 +38,41 @@ const weeks = computed(() =>
   ).reverse(),
 );
 const currentWeek = ref(weeks.value[0]);
+const previewWeeks = computed(() =>
+  Array.from(
+    {
+      length: Math.min(
+        18,
+        Math.max(1, ...props.tableData.map((t) => t.matchups?.length ?? 0)),
+      ),
+    },
+    (_, i) => i + 1,
+  ).reverse(),
+);
+const initialPreviewWeek = () =>
+  Math.min(
+    previewWeeks.value[0],
+    Math.max(1, store.currentLeague?.currentWeek || lastWeek.value + 1),
+  );
+const selectedPreviewWeek = ref(initialPreviewWeek());
+const selectedWeek = computed({
+  get: () =>
+    activeTab.value === "Report"
+      ? currentWeek.value
+      : selectedPreviewWeek.value,
+  set: (week: number) => {
+    if (activeTab.value === "Report") currentWeek.value = week;
+    else selectedPreviewWeek.value = week;
+  },
+});
+const selectableWeeks = computed(() =>
+  activeTab.value === "Report" ? weeks.value : previewWeeks.value,
+);
 watch(
   () => store.currentLeagueId,
   () => {
     currentWeek.value = weeks.value[0];
+    selectedPreviewWeek.value = initialPreviewWeek();
     activeTab.value = "Report";
   },
   { flush: "sync" },
@@ -84,13 +115,11 @@ function savePdf() {
       awards: awards.value,
       notes: notes.value,
       generatedAt: new Date().toLocaleString(),
-      performers: performers.value
-        .slice(0, 10)
-        .map((p) => ({
-          name: p.player.name || "Unknown player",
-          team: p.user,
-          points: p.points,
-        })),
+      performers: performers.value.slice(0, 10).map((p) => ({
+        name: p.player.name || "Unknown player",
+        team: p.user,
+        points: p.points,
+      })),
     });
   } catch (e) {
     toast.error(e instanceof Error ? e.message : "Unable to open report.");
@@ -262,10 +291,10 @@ function askAdvisor() {
         <label class="text-sm" for="report-week">Week</label
         ><select
           id="report-week"
-          v-model="currentWeek"
+          v-model="selectedWeek"
           class="rounded-md border bg-background p-2"
         >
-          <option v-for="week in weeks" :key="week" :value="week">
+          <option v-for="week in selectableWeeks" :key="week" :value="week">
             {{ week }}
           </option>
         </select>
@@ -455,11 +484,19 @@ function askAdvisor() {
         </details>
       </template>
     </template>
-    <WeeklyPreview
-      v-else
-      :table-data="tableData"
-      :current-week="Math.min(18, currentWeek + 1)"
-      :is-playoffs="currentWeek + 1 > regularSeasonLength"
-    />
+    <section v-else aria-label="Matchup preview">
+      <h3 class="text-xl font-semibold">
+        Week {{ selectedPreviewWeek }} matchups
+      </h3>
+      <p class="mt-1 mb-4 text-sm text-muted-foreground">
+        Opponents follow the imported league schedule for the selected week.
+        Projections are estimates, not final scores.
+      </p>
+      <WeeklyPreview
+        :table-data="tableData"
+        :current-week="selectedPreviewWeek"
+        :is-playoffs="selectedPreviewWeek > regularSeasonLength"
+      />
+    </section>
   </section>
 </template>

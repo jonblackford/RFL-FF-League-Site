@@ -160,3 +160,100 @@ test("weekly results and every player value work without a paid backend", async 
   expect(backendRequests).toEqual([]);
   expect(errors).toEqual([]);
 });
+
+test("matchup preview selects the week it actually displays and preserves the report week", async ({
+  page,
+}) => {
+  await installLeagueApiMocks(page);
+  await page.route(`**/v1/league/${SLEEPER_LEAGUE_ID}`, (r) =>
+    r.fulfill({
+      json: {
+        name: "Schedule League",
+        league_id: SLEEPER_LEAGUE_ID,
+        season: "2026",
+        sport: "nfl",
+        total_rosters: 4,
+        status: "in_season",
+        settings: {
+          last_scored_leg: 2,
+          playoff_week_start: 15,
+          playoff_teams: 2,
+          type: 0,
+        },
+        scoring_settings: { rec: 1 },
+        roster_positions: ["WR"],
+      },
+    }),
+  );
+  await page.route("**/v1/state/nfl", (r) =>
+    r.fulfill({ json: { week: 3, season: "2026", season_type: "regular" } }),
+  );
+  await page.route("**/v1/league/*/users", (r) =>
+    r.fulfill({
+      json: ["Alpha", "Beta", "Gamma", "Delta"].map((name, i) => ({
+        user_id: `owner-${i + 1}`,
+        display_name: name,
+        metadata: { team_name: name },
+      })),
+    }),
+  );
+  await page.route("**/v1/league/*/rosters", (r) =>
+    r.fulfill({
+      json: [1, 2, 3, 4].map((n) => ({
+        roster_id: n,
+        owner_id: `owner-${n}`,
+        players: [],
+        settings: { wins: 1, losses: 1, ties: 0, fpts: 100, ppts: 100 },
+      })),
+    }),
+  );
+  await page.route("**/v1/league/*/matchups/*", (r) => {
+    const week = Number(r.request().url().split("/").pop());
+    const pairs = week === 3 ? [1, 2, 1, 2] : [1, 1, 2, 2];
+    return r.fulfill({
+      json: [1, 2, 3, 4].map((n) => ({
+        roster_id: n,
+        matchup_id: pairs[n - 1],
+        points: n * 10,
+        players: [],
+        starters: [],
+        starters_points: [],
+        players_points: {},
+      })),
+    });
+  });
+  await page.route("**/v1/league/*/transactions/*", (r) =>
+    r.fulfill({ json: [] }),
+  );
+  await page.goto(
+    `${process.env.TEST_PAGES === "true" ? "/#/" : "/"}?leagueId=${SLEEPER_LEAGUE_ID}&destination=weekly_report`,
+  );
+  await expect(
+    page.getByRole("heading", { name: "Week 2 at a glance" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Matchup preview", exact: true })
+    .click();
+  await expect(page.getByLabel("Week", { exact: true })).toHaveValue("3");
+  const preview = page.getByRole("region", { name: "Matchup preview" });
+  await expect(
+    preview.getByRole("heading", { name: "Week 3 matchups" }),
+  ).toBeVisible();
+  const alpha = preview
+    .getByTestId("weekly-matchup")
+    .filter({ hasText: "Alpha" });
+  await expect(alpha).toContainText("Gamma");
+  await expect(alpha).not.toContainText("Beta");
+  await page.getByLabel("Week", { exact: true }).selectOption("2");
+  await expect(
+    preview.getByRole("heading", { name: "Week 2 matchups" }),
+  ).toBeVisible();
+  await expect(alpha).toContainText("Beta");
+  await expect(alpha).not.toContainText("Gamma");
+  await page
+    .getByRole("button", { name: "Back to report", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Week 2 at a glance" }),
+  ).toBeVisible();
+});

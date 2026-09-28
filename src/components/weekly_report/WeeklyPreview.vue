@@ -564,6 +564,8 @@ watch([() => store.darkMode, () => store.currentLeagueId], () =>
     <Card
       v-if="matchups.length > 0"
       v-for="matchup in matchups"
+      :key="`${props.currentWeek}-${matchup[0].rosterId}`"
+      data-testid="weekly-matchup"
       class="sm:px-2 px-1 py-2.5 mt-2 w-full xl:w-[calc(50%-.5rem)] overflow-auto"
     >
       <!-- Flex container for the two teams -->
