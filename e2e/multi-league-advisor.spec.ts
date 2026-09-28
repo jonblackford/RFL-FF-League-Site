@@ -169,7 +169,7 @@ test("saved leagues isolate team preferences and bounded AI conversations", asyn
             {
               finishReason: "STOP",
               content: {
-                parts: [{ text: `Grounded answer ${requests.length}` }],
+                parts: [{ text: `Grounded answer ${requests.length}\n\n### Summary\n\nConsider **Alpha Receiver**.\n\n### Next steps\n\n1. Check injuries.\n2. Review waivers.\n\n[Unsafe](javascript:alert(1))` }],
               },
             },
           ],
@@ -212,6 +212,11 @@ test("saved leagues isolate team preferences and bounded AI conversations", asyn
   await expect(
     page.getByText("Grounded answer 1", { exact: true }),
   ).toBeVisible();
+  const answer = page.locator(".ad-message.model").first();
+  await expect(answer.getByRole("heading", {name:"Summary",exact:true})).toBeVisible();
+  await expect(answer.locator("strong").filter({hasText:"Alpha Receiver"})).toBeVisible();
+  await expect(answer.locator("ol li")).toHaveCount(2);
+  await expect(answer.locator('a[href^="javascript:"]')).toHaveCount(0);
   await page.getByLabel("Ask a follow-up").fill("What is missing?");
   await page.getByRole("button", { name: "Ask advisor ↗" }).click();
   await expect(

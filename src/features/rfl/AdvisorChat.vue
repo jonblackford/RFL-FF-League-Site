@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount } from "vue";
+import { renderMarkdown } from "@/lib/markdown";
 import {
   firebaseAiEnabled,
   requestFirebaseAnswer,
@@ -163,7 +164,12 @@ async function ask(prompt?: string) {
         :class="['ad-message', m.role]"
       >
         <strong>{{ m.role === "user" ? "You" : "Advisor" }}</strong>
-        <p>{{ m.text }}</p>
+        <div
+          v-if="m.role === 'model'"
+          class="ad-answer"
+          v-html="renderMarkdown(m.text)"
+        ></div>
+        <p v-else>{{ m.text }}</p>
         <small v-if="m.role === 'model'"
           >Snapshot {{ new Date(m.fetchedAt).toLocaleString()
           }}{{
@@ -318,6 +324,45 @@ async function ask(prompt?: string) {
 .ad-message p {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.ad-answer {
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.ad-answer :deep(p) {
+  white-space: normal;
+  margin: 0.65em 0;
+}
+.ad-answer :deep(h1),
+.ad-answer :deep(h2),
+.ad-answer :deep(h3),
+.ad-answer :deep(h4) {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 1.2em 0 0.45em;
+}
+.ad-answer :deep(ul),
+.ad-answer :deep(ol) {
+  padding-left: 1.5em;
+  margin: 0.65em 0;
+}
+.ad-answer :deep(ul) { list-style: disc; }
+.ad-answer :deep(ol) { list-style: decimal; }
+.ad-answer :deep(li) { margin: 0.5em 0; }
+.ad-answer :deep(strong) { font-weight: 700; }
+.ad-answer :deep(code) {
+  font-size: 0.9em;
+  background: var(--ad-line, #e2e8f0);
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+}
+.ad-answer :deep(pre) { overflow-x: auto; padding: 0.75em; }
+.ad-answer :deep(a) { text-decoration: underline; }
+.ad-answer :deep(blockquote) {
+  border-left: 3px solid var(--ad-line, #cbd5e1);
+  padding-left: 1em;
+  margin: 0.75em 0;
 }
 .ad-message small {
   font-size: 10px;
