@@ -12,7 +12,13 @@ A Vue/TypeScript fantasy football workspace for Sleeper and ESPN leagues. Add a 
 - Existing standings, power rankings, expected wins, playoffs, history, draft, manager and trade analysis.
 - Existing ESPN analytics; the new custom-scored optimizer currently supports Sleeper.
 
-The About, Changelog, Privacy Policy, Terms and Account pages and their navigation links are removed. Existing URLs return to the main site while preserving league selection. Legacy paid service integrations are not enabled or bypassed by this change.
+The About, Changelog, Privacy Policy, Terms and Account pages and their navigation links are removed. Existing URLs return to the main site while preserving league selection. Public tools have no subscription gates. Weekly reports and Player Values calculate locally; optional AI explanations use the shared advisor.
+
+## Reports and integrated intelligence
+
+Choose **Weekly Report → week → Save PDF / print**, then **Save as PDF** in the print dialog. Add manager notes before exporting; notes are saved separately for each league, season and week. Text/image exports are also available.
+
+**Advisor → Insights** combines roster issues, scoring coverage, rising-usage waiver research and observed buy-low/sell-high signals. The workflows adapt `fantasy-football-ai` and Fantasy-Intelligence's evidence safeguards. See the [14-project source review](docs/source-integration-audit.md) for exactly what is integrated and what remains a reference. Shared visual styles, navigation groups and metric explanations now connect the existing league tools.
 
 ## Run locally
 

@@ -104,7 +104,7 @@ const routes = [
     meta: {
       title: "Fantasy Football Weekly Recap Generator | RFL Agent",
       description:
-        "Create fantasy football weekly recaps with matchup stories, league awards, customizable shared reports, and Premium video recaps.",
+        "Read weekly fantasy football results, awards and score comparisons, then download a text or image recap.",
       standalone: true,
     },
   },
@@ -232,7 +232,7 @@ const routes = [
     component: SharedReport,
     meta: {
       title: "Shared Weekly Report | RFL Agent",
-      description: "View a shared RFL Agent premium weekly report.",
+      description: "View a shared RFL Agent weekly report.",
       robots: "noindex, nofollow",
       standalone: true,
     },

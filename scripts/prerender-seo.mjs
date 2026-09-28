@@ -239,8 +239,8 @@ const pages = [
         body: "See how pick cost, ADP, projections, league format, and the distribution of team scores contribute to the final grade.",
       },
       {
-        title: "Draft tendencies and Premium planning",
-        body: "Review each manager’s historical position patterns for free, then use Premium for round-by-round positional plans, projected room pressure, strategy shifts, and league relative scouting.",
+        title: "Draft tendencies and planning",
+        body: "Review each manager’s historical position patterns, then explore round-by-round positional plans, projected room pressure, strategy shifts, and league relative scouting.",
       },
     ],
     faqs: [
@@ -274,7 +274,7 @@ const pages = [
     heading:
       "See what your draft room usually does before you are on the clock",
     introduction:
-      "A complete Premium Draft Room sample built from several seasons of manager draft tendencies and adjusted to one team and snake-draft slot.",
+      "A complete Draft Room sample built from several seasons of manager draft tendencies and adjusted to one team and snake-draft slot.",
     sectionHeading: "What the Draft Room sample shows",
     ctaHref: "/",
     ctaLabel: "Open league analyzer",
@@ -544,8 +544,8 @@ const pages = [
       "Read a complete Week 11 fantasy football recap example with matchup scores, avatar icons, matchup analysis, Team of the Week, and weekly lowlights.",
     heading: "Fantasy football weekly recap example: Week 11",
     introduction:
-      "A complete AI-written Premium report for a sample Sleeper league, including all six Week 11 matchup scores, Team of the Week, and weekly lowlights.",
-    sectionHeading: "Full sample Premium report",
+      "A complete AI-written sample report for a sample Sleeper league, including all six Week 11 matchup scores, Team of the Week, and weekly lowlights.",
+    sectionHeading: "Full sample report",
     ctaHref: "/fantasy-football-weekly-recap",
     ctaLabel: "Learn how fantasy football weekly recaps work",
     ogType: "article",
@@ -572,7 +572,7 @@ const pages = [
       "@type": "Article",
       headline: "Fantasy football weekly recap example: Week 11",
       description:
-        "A complete AI-written fantasy football Premium report with six matchup scores and recaps, avatar icons, Team of the Week, and weekly lowlights.",
+        "A complete AI-written fantasy football sample report with six matchup scores and recaps, avatar icons, Team of the Week, and weekly lowlights.",
       datePublished: "2026-07-28",
       dateModified: "2026-07-28",
       mainEntityOfPage:
@@ -604,7 +604,7 @@ const pages = [
       poster: "/video/ffwrapped-video-recap-poster-week-11-v2.jpg",
       label: "Play the RFL Agent Week 11 fantasy football video recap example",
       disclaimer:
-        "Sample league and team names are fictional. Video created with RFL Agent Premium for product demonstration.",
+        "Sample league and team names are fictional. Video created with RFL Agent for product demonstration.",
       ctaHref: "/",
       ctaLabel: "Create your own recap",
     },
@@ -616,7 +616,7 @@ const pages = [
       "@type": "VideoObject",
       name: "Fantasy football Week 11 video recap example",
       description:
-        "A 40-second RFL Agent Premium fantasy football video recap example with league storylines, matchup scores, and team results.",
+        "A 40-second RFL Agent fantasy football video recap example with league storylines, matchup scores, and team results.",
       thumbnailUrl:
         "/video/ffwrapped-video-recap-poster-week-11-v2.jpg",
       uploadDate: "2026-07-27",
@@ -734,7 +734,7 @@ const renderStaticPage = (page) => {
           </video>
           <section>
             <h2>Make next week your league’s story</h2>
-            <p>Connect a Sleeper or ESPN league, generate a Premium report, and turn it into a shareable video recap.</p>
+            <p>Connect a Sleeper or ESPN league, download a weekly text or image recap. This video is a sample.</p>
             <p><a href="${escapeHtml(page.video.ctaHref)}">${escapeHtml(page.video.ctaLabel)}</a></p>
           </section>
           <p>${escapeHtml(page.video.disclaimer)}</p>
@@ -795,7 +795,16 @@ const template = await readFile(resolve("dist/index.html"), "utf8");
 // the fallback again instead of leaving the page blank.
 const prerenderPaintGuard = `<style>html.prerender-pending [data-prerendered="true"]{display:none}</style><script>document.documentElement.classList.add("prerender-pending");window.setTimeout(function(){document.documentElement.classList.remove("prerender-pending")},5000)</script>`;
 
-for (const page of pages) {
+const currentToolCopy = {
+  'fantasy-football-weekly-recap': ['Weekly reports for every league', 'Read scored weeks with summary cards, matchup results, awards and scoring bars. Download text or an image, and use your own AI key for optional explanations.'],
+  'fantasy-football-player-values': ['Player values explained', 'Compare every rostered player using recorded league production, positional comparisons and a transparent 0–100 index. No account or subscription required.'],
+  'fantasy-football-trade-finder': ['Explore trade ideas', 'Compare players and explore possible trades using your imported rosters. Review the evidence with the advisor before making a decision.'],
+};
+for (const page of pages.filter(p => !['about','changelog','privacy','terms','account'].includes(p.path))) {
+  if (currentToolCopy[page.path]) {
+    const [heading,body]=currentToolCopy[page.path];
+    Object.assign(page,{heading,introduction:body,description:body,sections:[{title:heading,body}],faqs:[],sectionHeading:'Available to everyone'});
+  }
   const canonical = `/${page.path}`;
   const staticPage = renderStaticPage(page);
   const structuredData = page.structuredData

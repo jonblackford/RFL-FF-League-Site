@@ -22,7 +22,7 @@ jobs:
       - run: python3 -m unittest discover -s test -p 'test_data_refresh.py'
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test e2e/multi-league-advisor.spec.ts e2e/league-lifecycle.spec.ts
+      - run: npx playwright test e2e/multi-league-advisor.spec.ts e2e/league-lifecycle.spec.ts e2e/free-tools.spec.ts
       - name: Verify Pages build
         run: npm run build
         env:

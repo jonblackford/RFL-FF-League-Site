@@ -807,6 +807,10 @@ export const getMatchup = async (
         : [],
       benchPlayers: benchPlayers,
       benchPoints: benchPoints,
+      missingPlayerScores: [
+        ...benchPlayers.filter((id: string) => typeof playersPoints[id] !== "number" || !Number.isFinite(playersPoints[id])),
+        ...starters.filter((_id: string, index: number) => typeof game.starters_points?.[index] !== "number" || !Number.isFinite(game.starters_points[index])),
+      ],
     };
   });
 };

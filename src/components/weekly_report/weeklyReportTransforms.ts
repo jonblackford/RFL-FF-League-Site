@@ -1041,7 +1041,7 @@ export const getWeeklyAwards = ({
   }
 
   const gotAwayWithIt = [...winners]
-    .filter((team) => team.optimalPoints > 0)
+    .filter((team) => team.optimalPoints > 0 && team.pointsLeftOnBench > 0)
     .sort(
       (a, b) =>
         a.lineupEfficiency - b.lineupEfficiency ||
@@ -1059,7 +1059,7 @@ export const getWeeklyAwards = ({
     });
   }
 
-  const deservedBetter = [...losers].sort(
+  const deservedBetter = [...losers].filter(team => team.teamsOutscored > (teamCount - 1) / 2).sort(
     (a, b) =>
       b.teamsOutscored - a.teamsOutscored ||
       a.weeklyScoreRank - b.weeklyScoreRank

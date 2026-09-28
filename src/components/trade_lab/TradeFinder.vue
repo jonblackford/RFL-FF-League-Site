@@ -160,7 +160,7 @@ const showMoreSuggestions = () => {
 };
 
 const formatGain = (value: number) =>
-  `${Number.isFinite(value) ? value.toFixed(1) : "—"} pts/wk`;
+  `${Number.isFinite(value) ? value.toFixed(1) : "—"} value units`;
 const formatValue = (value: number) =>
   Number.isFinite(value) ? Math.round(value).toString() : "—";
 const formatValueMatch = (value: number) =>
@@ -178,8 +178,8 @@ const formatIncomingPlayers = (players: TradeSuggestion["teamASends"]) =>
   players.map((player) => `${player.name} (${player.position})`).join(" and ");
 const improvementBasis = computed(() =>
   props.valuationMode === "season results"
-    ? "estimated lineup output based on season results"
-    : "projected starting-lineup output"
+    ? "estimated roster fit based on results"
+    : "estimated roster fit"
 );
 
 const describeGain = (value: number) => {
@@ -281,22 +281,9 @@ const copySuggestion = async (suggestion: TradeSuggestion) => {
       <p
         class="max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base"
       >
-        Find trades where both teams improve
-        {{
-          valuationMode === "dynasty"
-            ? "their projected lineups while staying close in long term dynasty value"
-            : valuationMode === "season results"
-              ? "their season long lineup value"
-              : "their projected starting lineups"
-        }}. Values are based on
-        {{
-          valuationMode === "dynasty"
-            ? "dynasty ADP, league adjusted projected production,"
-            : valuationMode === "season results"
-              ? "full season performance"
-              : "rest of season projections"
-        }}
-        and league format.
+        Explore trades that look balanced under the available player values and positional needs.
+        Gains are heuristic value units, not predicted fantasy points. Player rankings,
+        recorded production and available draft ADP inform these estimates; confirm both teams’ roster fit.
       </p>
       <div class="flex flex-wrap gap-2 shrink-0">
         <div>
@@ -386,8 +373,7 @@ const copySuggestion = async (suggestion: TradeSuggestion) => {
     >
       <p class="font-medium">No mutually beneficial trades found</p>
       <p class="max-w-2xl mx-auto mt-1 text-sm text-muted-foreground">
-        This finder only shows reasonably balanced deals where both projected
-        starting lineups improve.
+        This finder shows reasonably balanced deals that improve both teams’ estimated roster fit. Missing player data can reduce the available suggestions.
         <template v-if="valuationMode === 'dynasty'">
           The finder may use one owned pick to balance a player deal.
         </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { openAdvisor } from "@/features/advisor/aiSession";
 import { computed, ref, watch } from "vue";
 import { getLeagueKey, useStore } from "../../store/store";
 import Card from "../ui/card/Card.vue";
@@ -12,21 +13,19 @@ import {
 import { handleImageFallback as handleImageError } from "@/lib/imageFallback";
 import type { ManagerArchetype } from "@/lib/narratives";
 import {
-  generateManagerComparison,
   type ManagerComparisonPayload,
 } from "@/api/api";
 import { Button } from "@/components/ui/button";
-import { useSubscriptionStore } from "@/store/subscription";
+
 
 import { renderMarkdown } from "@/lib/markdown";
 import { getChartTheme, getChartTooltipTheme } from "@/lib/chartTheme";
 import { getRivalryReportPairKey } from "@/lib/rivalryReport";
 
 const store = useStore();
-const subscriptionStore = useSubscriptionStore();
+
 const manager1 = ref("");
 const manager2 = ref("");
-const isGeneratingReport = ref(false);
 const generatedReport = ref("");
 const generationError = ref("");
 type PointSeasonEntry = {
@@ -256,10 +255,6 @@ const getManagerPayload = (
   },
 });
 
-const currentLeagueId = computed(
-  () => store.currentLeague?.leagueId ?? store.currentLeagueId
-);
-
 const currentLeagueKey = computed(() =>
   store.currentLeague
     ? getLeagueKey(store.currentLeague)
@@ -306,61 +301,7 @@ const aiComparisonPayload = computed<ManagerComparisonPayload>(() => ({
   },
 }));
 
-const lockedReportPreview = computed(() => {
-  const managerOne = getDisplayName(currentManager1.value) || "Manager A";
-  const managerTwo = getDisplayName(currentManager2.value) || "Manager B";
-
-  return `**${managerOne}** and **${managerTwo}** have the kind of rivalry that makes the standings feel personal. One manager owns the cleaner long term resume, but the other keeps hanging around with enough weekly spike scores and matchup weirdness to make every head-to-head feel unstable. The real story is not just who has more wins. It is whether consistency, roster aggression, and late-season timing have actually translated into bragging rights when these two are staring at each other across the schedule.`;
-});
-
-const visibleReport = computed(() =>
-  subscriptionStore.isPremium
-    ? generatedReport.value
-    : lockedReportPreview.value
-);
-
-const renderedReport = computed(() => renderMarkdown(visibleReport.value));
-
-const generateAiReport = async () => {
-  if (!subscriptionStore.isPremium || generatedReport.value) {
-    return;
-  }
-
-  if (!currentLeagueId.value) {
-    generationError.value = "League ID is required to generate a report.";
-    return;
-  }
-
-  if (!import.meta.env.VITE_MANAGER_COMPARISON) {
-    generationError.value = "Missing VITE_MANAGER_COMPARISON configuration.";
-    return;
-  }
-
-  try {
-    isGeneratingReport.value = true;
-    generationError.value = "";
-    const leagueKey = currentLeagueKey.value;
-    const pairKey = rivalryReportPairKey.value;
-    const selectionKey = rivalryReportSelectionKey.value;
-    const result = await generateManagerComparison(
-      currentLeagueId.value,
-      aiComparisonPayload.value
-    );
-    if (leagueKey && pairKey && isSavedRivalryReport(result.text)) {
-      store.addRivalryReport(leagueKey, pairKey, result.text);
-    }
-    if (selectionKey === rivalryReportSelectionKey.value) {
-      generatedReport.value = result.text;
-    }
-  } catch (error) {
-    generationError.value =
-      error instanceof Error
-        ? error.message
-        : "Unable to generate manager comparison.";
-  } finally {
-    isGeneratingReport.value = false;
-  }
-};
+const generateAiReport = () => openAdvisor('Explain this rivalry using the selected managers’ recorded history.', {provider:store.currentLeague?.platform || 'sleeper',leagueId:store.currentLeague?.leagueId,season:store.currentLeague?.season,team:'Manager comparison',fetchedAt:Date.now(),comparison:aiComparisonPayload.value});
 
 const seriesData = computed(() => {
   return [
@@ -903,60 +844,10 @@ const chartOptions = ref({
         <div>
           <p class="text-xl font-semibold tracking-tight">Rivalry Report</p>
         </div>
-        <Button
-          v-if="subscriptionStore.isPremium"
-          :disabled="isGeneratingReport || Boolean(generatedReport)"
-          @click="generateAiReport"
-        >
-          {{
-            isGeneratingReport
-              ? "Generating..."
-              : generatedReport
-                ? "Report generated"
-                : "Generate report"
-          }}
-        </Button>
+        <Button @click="generateAiReport">Ask advisor</Button>
       </div>
-      <div v-if="subscriptionStore.isPremium">
-        <p v-if="generationError" class="mt-3 text-sm text-destructive">
-          {{ generationError }}
-        </p>
-        <div
-          v-if="generatedReport"
-          v-html="renderedReport"
-          class="rivalry-report mt-4 max-w-[86ch] text-base leading-7 text-foreground/90 dark:text-foreground/85"
-        ></div>
-        <p
-          v-else-if="!generationError"
-          class="mt-3 max-w-[60ch] leading-7 text-muted-foreground"
-        >
-          Generate a comparison using the selected managers' performance
-          throughout every season.
-        </p>
-      </div>
-      <div v-else class="mt-3 max-w-[86ch]">
-        <p
-          class="mb-4 max-w-[60ch] text-sm leading-6 text-muted-foreground sm:text-base"
-        >
-          Premium rivalry reports turn the manager comparison into a
-          personalized short story about the selected managers' history, style,
-          and bragging rights.
-        </p>
-        <div
-          class="relative p-4 mt-3 overflow-hidden border max-h-48 rounded-card sm:p-5"
-        >
-          <div
-            v-html="renderedReport"
-            class="text-base leading-7 rivalry-report text-foreground/90 dark:text-foreground/85"
-          ></div>
-          <div
-            class="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-background via-background/95 to-transparent"
-          ></div>
-          <div class="absolute inset-x-0 z-10 flex justify-center bottom-5">
-
-          </div>
-        </div>
-      </div>
+      <div v-if="generatedReport" class="rivalry-report mt-4" v-html="renderMarkdown(generatedReport)"></div>
+      <p class="mt-3 text-sm text-muted-foreground">Explore these managers’ results, styles and head-to-head history with the advisor.</p>
     </div>
     <p class="mt-4 mb-8 ml-3 text-lg font-semibold sm:ml-6 sm:mb-0">
       Recent Performances

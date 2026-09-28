@@ -1,18 +1,19 @@
 <script setup lang="ts">
+import { openAdvisor } from "@/features/advisor/aiSession";
 import { computed, ref, watch } from "vue";
 import Card from "../ui/card/Card.vue";
-import { generateManagerArchetype, type ManagerBlurbsPayload } from "@/api/api";
+import { type ManagerBlurbsPayload } from "@/api/api";
 import { getDraftGrade, type ManagerArchetype } from "@/lib/narratives";
 import { toast } from "vue-sonner";
-import { getLeagueKey, useStore } from "@/store/store";
+import { useStore } from "@/store/store";
 import Separator from "../ui/separator/Separator.vue";
-import { useSubscriptionStore } from "@/store/subscription.ts";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getLeagueAnalyticsProperties, trackEvent } from "@/lib/analytics";
 
 const store = useStore();
-const subscriptionStore = useSubscriptionStore();
+
 
 const props = defineProps<{
   archetypes: ManagerArchetype[];
@@ -43,18 +44,7 @@ const getManagerArchetypes = async () => {
     const payload = props.preparePayload
       ? await props.preparePayload()
       : props.payload;
-    const result = await generateManagerArchetype(payload);
-    blurbsByUserId.value = result.blurbs.reduce(
-      (accumulator, entry) => {
-        accumulator[entry.userId] = entry.blurb;
-        return accumulator;
-      },
-      {} as Record<string, string>
-    );
-    store.addManagerProfiles(
-      getLeagueKey(store.currentLeague),
-      blurbsByUserId.value
-    );
+    openAdvisor('Describe these managers using the supplied league history. Explain strengths and weaknesses in plain language.', {provider:store.currentLeague?.platform || 'sleeper',leagueId:store.currentLeague?.leagueId,season:store.currentLeague?.season,team:'Manager profiles',fetchedAt:Date.now(),profiles:payload});
     trackEvent("Feature Action Completed", {
       feature: "manager_profiles",
       action: "profiles_generated",
@@ -83,24 +73,15 @@ const storedManagerProfiles = computed(
   () => store.currentLeague?.managerProfiles ?? {}
 );
 
-const allManagerProfilesGenerated = computed(
-  () =>
-    props.payload.managers.length > 0 &&
-    props.payload.managers.every((manager) =>
-      Boolean(blurbsByUserId.value[manager.userId]?.trim())
-    )
-);
-
 const canGenerateArchetypes = computed(
   () =>
     props.payload.managers.length > 0 &&
-    !isLoading.value &&
-    !allManagerProfilesGenerated.value
+    !isLoading.value
 );
 
 const generateButtonLabel = computed(() => {
   if (isLoading.value) return "Generating...";
-  return "Generate profiles";
+  return "Ask advisor about managers";
 });
 
 const visibleArchetypes = computed(() =>
@@ -451,14 +432,6 @@ watch(
         >
           {{ blurbsByUserId[archetype.userId] }}
         </p>
-        <div
-          v-if="
-            !subscriptionStore.isPremium && blurbsByUserId[archetype.userId]
-          "
-          class="flex justify-center mt-3"
-        >
-
-        </div>
         <p
           class="my-4 text-sm leading-relaxed text-muted-foreground"
           v-else-if="isLoading"

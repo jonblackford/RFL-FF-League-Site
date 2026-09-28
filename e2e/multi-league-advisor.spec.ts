@@ -48,6 +48,9 @@ test("advisor connects team selection, comparisons, watchlists and AI on mobile"
     page.getByRole("heading", { name: "Every league. A clearer next move." }),
   ).toBeVisible();
   await expect(page.getByLabel("Team", { exact: true })).toHaveValue("1");
+  await page.getByRole('navigation',{name:'Advisor sections'}).getByRole('button',{name:'Insights',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Your weekly research desk'})).toBeVisible();
+  await expect(page.getByLabel('Football intelligence')).toContainText(/SCORING COVERAGE/i);
   await page.getByLabel("Team", { exact: true }).selectOption("2");
   await expect(
     page.getByText("Sleeper Team Two · Week 3", { exact: true }),

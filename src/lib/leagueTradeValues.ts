@@ -1,3 +1,4 @@
+import { isRecordedScore } from "./recordedScore";
 import { getPlayersByIdsMap } from "@/api/playerApi";
 import {
   getDraftProjections,
@@ -45,7 +46,7 @@ export const isDynastyLeague = (league?: LeagueInfoType | null) =>
   league?.seasonType?.toLowerCase() === "dynasty";
 
 export const getTradeValuationMode = (
-  league?: LeagueInfoType | null
+  league?: LeagueInfoType | null,
 ): TradeValuationMode =>
   isDynastyLeague(league)
     ? "dynasty"
@@ -74,34 +75,34 @@ export const buildDynastyDraftPickAssets = ({
       ...tradedPicks
         .map((pick) => Number(pick.season))
         .filter((season) => season >= firstPickSeason),
-    ])
+    ]),
   ).sort((a, b) => a - b);
   const rookieDraftPickCount = league.draftPicks?.length ?? 0;
   const recentDraftRounds =
     rookieDraftPickCount > 0 &&
     rookieDraftPickCount <= Math.max(1, league.totalRosters) * 8
       ? Math.max(
-          ...(league.draftPicks ?? []).map((pick) => Number(pick.round) || 0)
+          ...(league.draftPicks ?? []).map((pick) => Number(pick.round) || 0),
         )
       : 0;
   const tradedPickRounds = Math.max(
     0,
-    ...tradedPicks.map((pick) => pick.round)
+    ...tradedPicks.map((pick) => pick.round),
   );
   const roundCount = Math.min(
     6,
     recentDraftRounds > 0
       ? Math.max(recentDraftRounds, tradedPickRounds)
-      : Math.max(4, tradedPickRounds)
+      : Math.max(4, tradedPickRounds),
   );
   const rosterNameById = new Map(
-    rosters.map((roster) => [roster.id, roster.managerName])
+    rosters.map((roster) => [roster.id, roster.managerName]),
   );
   const currentOwnerByPick = new Map(
     tradedPicks.map((pick) => [
       `${pick.season}:${pick.round}:${pick.rosterId}`,
       pick.ownerId,
-    ])
+    ]),
   );
 
   return seasons.flatMap((season) =>
@@ -126,8 +127,8 @@ export const buildDynastyDraftPickAssets = ({
               : ""
           }`,
         };
-      })
-    )
+      }),
+    ),
   );
 };
 
@@ -208,16 +209,55 @@ export const buildTradeValueRequest = ({
     remainingWeeks:
       league.status === "complete" ? 18 : Math.max(1, 18 - selectedWeek + 1),
     dynastyPerspective,
+    production: Object.fromEntries(
+      [...new Set(rosters.flatMap((r) => r.playerIds))].map((id) => {
+        let points = 0,
+          weeks = 0;
+        for (
+          let week = 0;
+          week <
+          Math.min(
+            league.lastScoredWeek || 0,
+            league.status === "complete" ? 18 : selectedWeek - 1,
+          );
+          week++
+        ) {
+          for (const team of tableData) {
+            const starter = team.starters?.[week]?.indexOf(id) ?? -1;
+            const bench = team.benchPlayers?.[week]?.indexOf(id) ?? -1;
+            const value =
+              starter >= 0
+                ? team.starterPoints?.[week]?.[starter]
+                : bench >= 0
+                  ? team.benchPoints?.[week]?.[bench]
+                  : undefined;
+            if (
+              isRecordedScore(
+                value,
+                id,
+                team.missingPlayerScores?.[week],
+                starter < 0,
+              )
+            ) {
+              points += value;
+              weeks++;
+              break;
+            }
+          }
+        }
+        return [id, { points, weeks }];
+      }),
+    ),
     finderForRosterId: null,
   };
 };
 
 const groupRankingsByRoster = (
   request: TradeValueRequestPayload,
-  rankings: TradeFinderPlayer[]
+  rankings: TradeFinderPlayer[],
 ): LeagueTradeValueRoster[] => {
   const rankingById = new Map(
-    rankings.map((ranking) => [ranking.playerId, ranking])
+    rankings.map((ranking) => [ranking.playerId, ranking]),
   );
   return request.rosters.map((roster) => ({
     id: roster.id,
@@ -251,6 +291,8 @@ export type TradeBuilderPlayer = Player & {
   positionRank: number;
   overallRank: number;
   dynastyAdp: number | null;
+  tradeValue?: number;
+  dataAvailable?: boolean;
 };
 
 export type TradeBuilderRoster = {
@@ -268,7 +310,7 @@ type TradeBuilderBasicRanking = {
 const TRADE_BUILDER_RANKING_CONCURRENCY = 8;
 
 export const sortTradeBuilderPlayers = (
-  players: TradeBuilderPlayer[]
+  players: TradeBuilderPlayer[],
 ): TradeBuilderPlayer[] => {
   const useOverallRank = players.some((player) => player.overallRank > 0);
   const rankValue = (player: TradeBuilderPlayer) => {
@@ -284,17 +326,17 @@ export const sortTradeBuilderPlayers = (
       (a.positionRank > 0 ? a.positionRank : Number.POSITIVE_INFINITY) -
         (b.positionRank > 0 ? b.positionRank : Number.POSITIVE_INFINITY) ||
       (a.name || `${a.team} Defense`).localeCompare(
-        b.name || `${b.team} Defense`
-      )
+        b.name || `${b.team} Defense`,
+      ),
   );
 };
 
 export const mergeTradeBuilderRankings = (
   rosters: TradeBuilderRoster[],
-  rankings: TradeFinderPlayer[]
+  rankings: TradeFinderPlayer[],
 ): TradeBuilderRoster[] => {
   const rankingById = new Map(
-    rankings.map((ranking) => [ranking.playerId, ranking])
+    rankings.map((ranking) => [ranking.playerId, ranking]),
   );
   return rosters.map((roster) => ({
     ...roster,
@@ -303,19 +345,25 @@ export const mergeTradeBuilderRankings = (
         const ranking = rankingById.get(player.playerId);
         return {
           ...player,
+          ...(ranking
+            ? {
+                tradeValue: ranking.tradeValue,
+                dataAvailable: ranking.dataAvailable,
+              }
+            : {}),
           positionRank: ranking?.positionRank ?? player.positionRank,
           overallRank: ranking?.overallRank ?? player.overallRank,
         };
-      })
+      }),
     ),
   }));
 };
 
 export const applyTradeBuilderRankingResponse = (
   rosters: TradeBuilderRoster[],
-  response: Pick<PlayerValuesResponse, "access" | "rankings">
+  response: Pick<PlayerValuesResponse, "access" | "rankings">,
 ): TradeBuilderRoster[] =>
-  response.access === "premium"
+  response.access !== "preview"
     ? mergeTradeBuilderRankings(rosters, response.rankings)
     : rosters;
 
@@ -346,7 +394,7 @@ export const loadTradeBuilderRosters = async (options: {
           options.league.scoringType,
           "Dynasty",
           superflex,
-          idpPositions.has(player?.position?.toUpperCase() ?? "")
+          idpPositions.has(player?.position?.toUpperCase() ?? ""),
         );
         return [
           playerId,
@@ -361,7 +409,7 @@ export const loadTradeBuilderRosters = async (options: {
       const stats = await getStats(
         playerId,
         options.league.season,
-        options.league.scoringType
+        options.league.scoringType,
       );
       return [
         playerId,
@@ -371,7 +419,7 @@ export const loadTradeBuilderRosters = async (options: {
           dynastyAdp: null,
         },
       ] as const;
-    }
+    },
   );
   const basicRankingById = new Map(basicRankingEntries);
   return request.rosters.map((roster) => ({
@@ -391,7 +439,7 @@ export const loadTradeBuilderRosters = async (options: {
             dynastyAdp: basicRanking?.dynastyAdp ?? null,
           };
         })
-        .filter((player): player is TradeBuilderPlayer => player !== null)
+        .filter((player): player is TradeBuilderPlayer => player !== null),
     ),
   }));
 };

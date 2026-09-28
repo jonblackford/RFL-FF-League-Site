@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
+import * as playerApi from "../src/api/playerApi.ts";
 import * as authFetchModule from "../src/lib/authFetch.ts";
 import {
   getPlayerValues,
@@ -37,20 +38,18 @@ const request = {
 afterEach(() => vi.restoreAllMocks());
 
 describe("trade value backend client", () => {
-  test("accepts a limited preview without manufacturing omitted players", async () => {
-    vi.spyOn(authFetchModule, "authenticatedFetch").mockResolvedValue(
-      response(200, {
-        access: "preview",
-        previewLimit: 10,
-        totalPlayers: 42,
-        rankings: [{ playerId: "p1", overallRank: 1 }],
-      })
-    );
-
-    const result = await getPlayerValues(request);
-    expect(result.access).toBe("preview");
-    expect(result.rankings).toHaveLength(1);
-    expect(result.totalPlayers).toBe(42);
+  test("returns every rostered player without contacting the absent valuation backend", async () => {
+    const backend = vi.spyOn(authFetchModule, "authenticatedFetch");
+    vi.spyOn(playerApi,"getPlayersByIdsMap").mockResolvedValue(new Map([
+      ['p1',{player_id:'p1',name:'Alpha',position:'WR',team:'DET'}],
+      ['p2',{player_id:'p2',name:'Beta',position:'RB',team:'BUF'}],
+    ]));
+    const result=await getPlayerValues({...request,production:{p1:{points:40,weeks:2}}});
+    expect(result.rankings).toHaveLength(2);
+    expect(result.totalPlayers).toBe(2);
+    expect(result.rankings[0].observedAverage).toBe(20);
+    expect(result.rankings[1].dataAvailable).toBe(false);
+    expect(backend).not.toHaveBeenCalled();
   });
 
   test("surfaces server-side finder entitlement failures", async () => {

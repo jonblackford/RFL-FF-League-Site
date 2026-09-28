@@ -55,9 +55,9 @@ const faqs = [
       "The comparison combines career results, scoring, championships, efficiency, expected wins, and the complete head-to-head record for the selected managers.",
   },
   {
-    question: "Are profiles and rivalry reports Premium?",
+    question: "Are profiles and rivalry reports available to everyone?",
     answer:
-      "Yes. Premium unlocks generated manager profiles and rivalry reports for the leagues you manage. The underlying comparison statistics remain visible alongside the generated story.",
+      "Yes. Manager statistics are available to everyone. Use the advisor with your own AI key for optional explanations of profiles and rivalries.",
   },
 ];
 
@@ -76,7 +76,7 @@ const faqs = [
           class="relative grid max-w-6xl gap-12 px-5 py-16 mx-auto sm:py-24 lg:grid-cols-[minmax(0,0.82fr)_minmax(500px,1.18fr)] lg:items-center"
         >
           <div>
-            <Badge variant="secondary">Premium league history</Badge>
+            <Badge variant="secondary">League history</Badge>
             <h1
               class="max-w-3xl mt-5 text-4xl font-semibold tracking-tight text-pretty sm:text-5xl"
             >
@@ -198,7 +198,7 @@ const faqs = [
               Find the story hiding in your league history
             </h2>
             <p class="max-w-2xl mt-2 leading-7 text-primary-foreground/80">
-              Premium unlocks manager profiles and rivalry reports across every
+              Explore manager profiles and rivalry reports across every
               Sleeper and ESPN league you manage.
             </p>
           </div>

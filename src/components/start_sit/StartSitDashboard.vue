@@ -93,7 +93,7 @@ const demoPosts = shallowRef<NewsPost[]>([]);
 const demoValues = shallowRef<StartSitPlayerValue[]>([]);
 const playerValues = shallowRef<Map<string, StartSitPlayerValue>>(new Map());
 const valuesLoading = ref(false);
-const valueAccess = ref<"preview" | "premium" | null>(null);
+const valueAccess = ref<"preview" | "premium" | "full" | null>(null);
 let valueLoadRequestId = 0;
 const props = defineProps<{
   tableData: TableDataType[];
@@ -370,7 +370,7 @@ const loadStartSitValues = async () => {
     if (requestId === valueLoadRequestId) {
       valueAccess.value = result.access;
       playerValues.value =
-        result.access === "premium"
+        result.access !== "preview"
           ? new Map(
               result.rankings.map(({ playerId, tradeValue, positionRank }) => [
                 playerId,
@@ -812,7 +812,7 @@ watch(
                     variant="outline"
                     class="w-fit shrink-0"
                   >
-                    Premium context applied
+                    Recorded values applied
                   </Badge>
                 </div>
                 <div
@@ -833,13 +833,11 @@ watch(
                 </div>
                 <p class="mt-3 text-xs leading-5 text-muted-foreground">
                   <template v-if="hasCurrentRosterValues">
-                    Weekly calls combine projections, recent form, and Premium's
-                    league adjusted player values.
+                    Weekly calls combine projections, recent form, and recorded league production.
                   </template>
                   <template v-else>
                     Start/sit recommendations use weekly projections and recent
-                    performance. Premium adds league adjusted player values for
-                    additional context.
+                    performance. Recorded player values add context when scoring history is available.
                   </template>
                 </p>
 

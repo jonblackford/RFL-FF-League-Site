@@ -12,6 +12,8 @@ import { buildEvidence } from "@/features/rfl/presentation";
 import { statLabel } from "@/features/rfl/scoring";
 import { readAdvisorPreferences, writeAdvisorPreferences } from "./preferences";
 import type { RflPlayer } from "@/features/rfl/types";
+import { buildIntelligence } from "./intelligence";
+import IntelligencePanel from "./IntelligencePanel.vue";
 import AdvisorOverview from "./AdvisorOverview.vue";
 import AdvisorPlayers from "./AdvisorPlayers.vue";
 import PlayerComparison from "./PlayerComparison.vue";
@@ -35,7 +37,7 @@ const team = ref(1),
   onlyWatched = ref(false),
   compared = ref<string[]>([]),
   watchlist = ref<string[]>([]);
-const tabs = ["Overview", "Lineup", "Waivers", "Players", "Reports", "League"];
+const tabs = ["Overview", "Insights", "Lineup", "Waivers", "Players", "Reports", "League"];
 const tab = ref(
   tabs.includes(String(route.query.advisor))
     ? String(route.query.advisor)
@@ -80,6 +82,7 @@ watch(
   },
   { immediate: true },
 );
+const intelligence = computed(() => snapshot.value ? buildIntelligence(snapshot.value,enrichment.value,league.value?.weeklyPoints || []) : null);
 const evidence = computed(() =>
   snapshot.value
     ? {
@@ -94,6 +97,7 @@ const evidence = computed(() =>
         })),
         historicalFeedGeneratedAt: enrichment.value?.generatedAt,
         historicalFeedError: enrichmentError.value,
+        intelligence: intelligence.value,
       }
     : null,
 );
@@ -338,6 +342,7 @@ function openLegacy(feature: string) {
             {{ t }}
           </button>
         </nav>
+        <IntelligencePanel v-if="tab === 'Insights' && intelligence" :insights="intelligence" @ask="ask" />
         <AdvisorOverview
           v-if="tab === 'Overview'"
           :snapshot="snapshot"

@@ -55,7 +55,7 @@ const methodology = [
 
 const draftPlanningOptions = [
   {
-    tier: "Free",
+    tier: "Tendencies",
     title: "Understand each manager’s draft tendencies",
     description:
       "Use completed league history to review favorite early-round positions, opening strategies, quarterback and tight end timing, and historical draft rankings.",
@@ -66,7 +66,7 @@ const draftPlanningOptions = [
     ],
   },
   {
-    tier: "Premium",
+    tier: "Draft Room",
     title: "Prepare for your next draft room",
     description:
       "Turn those tendencies into a positional plan for your manager and snake-draft slot, with projected room pressure and scouting for every league mate.",
@@ -241,7 +241,7 @@ const analysisRoute = {
           <p class="mt-4 leading-7 text-muted-foreground">
             Completed drafts do more than produce a grade. In Manager Profiles,
             RFL Agent turns your league’s history into draft tendencies for
-            everyone and a Premium Draft Room built for pre-draft planning.
+            everyone and a Draft Room built for pre-draft planning.
           </p>
         </div>
 
@@ -254,7 +254,7 @@ const analysisRoute = {
             class="p-6 sm:p-7"
           >
             <Badge
-              :variant="option.tier === 'Premium' ? 'default' : 'secondary'"
+              :variant="option.tier === 'Draft Room' ? 'default' : 'secondary'"
             >
               {{ option.tier }}
             </Badge>
@@ -273,7 +273,7 @@ const analysisRoute = {
               </li>
             </ul>
             <Button
-              v-if="option.tier === 'Premium'"
+              v-if="option.tier === 'Draft Room'"
               as-child
               variant="outline"
               class="mt-6"

@@ -48,7 +48,7 @@ jobs:
           VITE_GITHUB_PAGES: 'true'
       - run: npx playwright install --with-deps chromium
       - name: Smoke-test Pages routing
-        run: npx playwright test e2e/multi-league-advisor.spec.ts
+        run: npx playwright test e2e/multi-league-advisor.spec.ts e2e/free-tools.spec.ts
         env:
           TEST_PAGES: 'true'
       - name: Save validated historical feed

@@ -1,3 +1,5 @@
+import { getPlayersByIdsMap } from "./playerApi";
+import { rankRecordedPlayers, type RecordedProduction } from "@/lib/recordedPlayerValues";
 import { authenticatedBackendFetch } from "@/lib/backendApi";
 import { assertOk, parseJson } from "@/lib/http";
 import type {
@@ -25,6 +27,7 @@ export type TradeValueRequestPayload = {
     playerIds: string[];
     draftPicks?: TradeFinderPick[];
   }>;
+  production?: RecordedProduction;
   selectedWeek: number;
   remainingWeeks: number;
   dynastyPerspective: DynastyPerspective;
@@ -33,7 +36,7 @@ export type TradeValueRequestPayload = {
 };
 
 type TradeValueResponseMetadata = {
-  access: "preview" | "premium";
+  access: "preview" | "premium" | "full";
   previewLimit: number;
   totalPlayers: number;
 };
@@ -104,8 +107,13 @@ const post = async <T>(path: string, body: unknown, label: string) => {
   return parseJson<T>(response, label);
 };
 
-export const getPlayerValues = (payload: TradeValueRequestPayload) =>
-  post<PlayerValuesResponse>("/api/playerValues", payload, "Player values");
+export const getPlayerValues = async (payload: TradeValueRequestPayload): Promise<PlayerValuesResponse> => {
+  const ids = [...new Set(payload.rosters.flatMap(r => r.playerIds))];
+  const directory = await getPlayersByIdsMap(ids);
+  const players = ids.map(id => directory.get(id) ?? {player_id:id,name:`Player ${id}`,position:'Unknown',team:''});
+  const rankings = rankRecordedPlayers(players, payload.production ?? {}, payload.league.rosterPositions, payload.league.totalRosters);
+  return {access:'full',previewLimit:rankings.length,totalPlayers:rankings.length,rankings};
+};
 
 export const getTradeSuggestions = (
   payload: TradeValueRequestPayload & { finderForRosterId: number }

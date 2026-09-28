@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { openAdvisor } from "@/features/advisor/aiSession";
 import { computed, ref, onMounted } from "vue";
-import { getLeagueKey, useStore } from "../../store/store";
-import { generatePreview } from "../../api/api";
+import { useStore } from "../../store/store";
 import { TableDataType, LeagueInfoType } from "../../types/types";
 import Button from "../ui/button/Button.vue";
 import { renderMarkdown } from "@/lib/markdown";
@@ -14,16 +14,7 @@ onMounted(() => {
     store.currentLeague?.weeklyPreview ?? "";
 });
 
-const getPreview = async () => {
-  if (!preview.value) {
-    loading.value = true;
-    const response = await generatePreview(promptData.value);
-    preview.value = response.text;
-    const currentLeague = store.currentLeague;
-    store.addWeeklyPreview(getLeagueKey(currentLeague), preview.value);
-    loading.value = false;
-  }
-};
+const getPreview = () => openAdvisor('Explain these projected matchups and the main uncertainties.', {provider:store.currentLeague?.platform || 'sleeper',leagueId:store.currentLeague?.leagueId,season:store.currentLeague?.season,team:'Matchup preview',fetchedAt:Date.now(),preview:promptData.value});
 
 const renderedPreview = computed(() => {
   return renderMarkdown(preview.value);
@@ -71,7 +62,7 @@ const getPreviewWeek = (league: LeagueInfoType | undefined) => {
 };
 
 const promptData = computed(() => {
-  const matchupData = props.matchups.map((matchup: any) => {
+  const matchupData = props.matchups.filter(m => m.length === 2).map((matchup: any) => {
     const team1 = {
       name: store.showUsernames ? matchup[0].username : matchup[0].name,
       losses: matchup[0].losses,
@@ -124,7 +115,7 @@ const promptData = computed(() => {
     <div class="flex justify-between">
       <h3 class="text-xl font-semibold tracking-tight">Matchup Forecast</h3>
       <Button class="" v-if="preview === ''" @click="getPreview">
-        Generate
+        Ask advisor
       </Button>
     </div>
     <div v-if="preview" class="mt-1">

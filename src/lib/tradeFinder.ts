@@ -17,6 +17,9 @@ export type TradeFinderPlayer = {
   positionRank: number;
   overallRank: number;
   dynastyAdp?: number | null;
+  observedAverage?: number;
+  observedWeeks?: number;
+  dataAvailable?: boolean;
 };
 
 export type TradeFinderRoster = {
@@ -101,9 +104,9 @@ export type LocalTradeSuggestionOptions = {
 const getFiniteNumber = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value) ? value : 0;
 
-const getPlayerValue = (player: LocalTradeFinderPlayer) => {
-  const tradeValue = getFiniteNumber(player.tradeValue);
-  if (tradeValue > 0) return tradeValue;
+export const getPlayerValue = (player: LocalTradeFinderPlayer) => {
+  if (player.dataAvailable === false) return 0;
+  if (typeof player.tradeValue === "number" && Number.isFinite(player.tradeValue)) return player.tradeValue;
 
   const dynastyAdp = getFiniteNumber(player.dynastyAdp);
   if (dynastyAdp > 0) return Math.max(1, 120 - dynastyAdp);
@@ -336,7 +339,7 @@ export const generateLocalTradeSuggestions = ({
 }: LocalTradeSuggestionOptions): TradeSuggestion[] => {
   const preparedRosters = rosters.map((roster) => ({
     ...roster,
-    players: roster.players.map(toFinderPlayer),
+    players: roster.players.filter(p => p.dataAvailable !== false).map(toFinderPlayer),
   }));
   const targetRoster = preparedRosters.find((roster) => roster.id === forRosterId);
   if (!targetRoster) return [];

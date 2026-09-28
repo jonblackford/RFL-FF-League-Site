@@ -248,7 +248,7 @@ const openAddLeagueDialog = async () => {
           <DropdownMenuTrigger as-child>
             <SidebarMenuButton
               size="lg"
-              class="w-full min-w-0 text-sidebar-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              class="w-full min-w-0 text-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <div class="flex min-w-0 flex-1 flex-col gap-0.5 md:w-40">
                 <span class="font-medium truncate">{{

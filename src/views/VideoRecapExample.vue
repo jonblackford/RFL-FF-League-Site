@@ -38,8 +38,7 @@ const trackCreateRecap = () => {
           Make next week your league’s story
         </h2>
         <p class="mt-2 text-sm leading-6 text-slate-300">
-          Connect a Sleeper or ESPN league, generate a Premium report, and turn
-          it into a shareable video recap.
+          Connect a Sleeper or ESPN league to create a weekly report and download its text or image. This video is a sample; video rendering is not part of the browser app.
         </p>
         <Button as-child size="lg" variant="secondary" class="w-full mt-4">
           <RouterLink to="/" @click="trackCreateRecap">
@@ -51,7 +50,7 @@ const trackCreateRecap = () => {
 
       <p class="mt-4 text-xs leading-5 text-muted-foreground">
         Sample league and team names are fictional. Video created with RFL Agent
-        Premium for product demonstration.
+        for product demonstration.
       </p>
     </article>
   </PublicPageShell>

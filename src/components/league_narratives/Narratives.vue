@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, shallowRef, watch } from "vue";
 import { getLeagueKey, useStore } from "../../store/store.ts";
-import { useAuthStore } from "@/store/auth";
-import { useSubscriptionStore } from "@/store/subscription.ts";
+
 import ManagerArchetypesCard from "./ManagerArchetypesCard.vue";
 import DraftFingerprintsCard from "./DraftFingerprintsCard.vue";
 import { TableDataType } from "@/types/types.ts";
@@ -33,8 +32,8 @@ import { loadDemoManagerProfiles } from "@/data/demo/loaders";
 import { createHistoricalDraftHydrator } from "@/lib/draftHistoryHydration";
 
 const store = useStore();
-const authStore = useAuthStore();
-const subscriptionStore = useSubscriptionStore();
+
+
 const props = defineProps<{
   tableData: TableDataType[];
 }>();
@@ -122,10 +121,6 @@ const narrativeDraftType = computed(() => {
       : "snake")
   );
 });
-const hasPremiumAccess = computed(
-  () => authStore.isAuthenticated && subscriptionStore.isPremium
-);
-
 const hydrateLeagueDraftPicks = createHistoricalDraftHydrator({
   loadMetadata: getDraftMetadata,
   loadPicks: getDraftPicks,
@@ -301,9 +296,7 @@ const relativeRanks = computed(() => {
 });
 
 const managerPayload = computed<ManagerBlurbsPayload>(() => {
-  const managers = hasPremiumAccess.value
-    ? narratives.value.managerArchetypes
-    : narratives.value.managerArchetypes.slice(0, 1);
+  const managers = narratives.value.managerArchetypes;
 
   return {
     league: {
@@ -403,7 +396,6 @@ const managerPayload = computed<ManagerBlurbsPayload>(() => {
       :league-size="store.currentLeague?.totalRosters"
       :draft-type="narrativeDraftType"
       :auction-budget="store.currentLeague?.draftMetadata?.auctionBudget"
-      :is-premium="hasPremiumAccess"
     />
     <ManagerComparison
       v-if="isLeagueHistoryReady && historicalManagerRows.length > 1"

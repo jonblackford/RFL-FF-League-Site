@@ -27,6 +27,7 @@ type MatchupPointRow = {
   starterPoints: number[];
   benchPlayers: string[];
   benchPoints: number[];
+  missingPlayerScores?: string[];
 };
 
 const getTierMultiplier = (position: string, rank: number) => {
@@ -400,7 +401,7 @@ export const getWeeklyPoints = async (
       : getMatchup(week, leagueId)
   );
   const validMatchups = flatten(allMatchups).filter(
-    (matchup): matchup is MatchupPointRow =>
+    (matchup) =>
       Boolean(matchup) && typeof matchup.rosterId === "number"
   );
   const grouped = Object.values(groupBy(validMatchups, "rosterId"));
@@ -417,15 +418,8 @@ export const getWeeklyPoints = async (
           starterPoints,
           benchPlayers,
           benchPoints,
-        }: {
-          rosterId: number;
-          points: number;
-          matchupId: number;
-          starters: string[];
-          starterPoints: number[];
-          benchPlayers: string[];
-          benchPoints: number[];
-        }
+          missingPlayerScores,
+        }: MatchupPointRow
       ) => {
         if (!result[rosterId]) {
           result[rosterId] = {
@@ -447,6 +441,11 @@ export const getWeeklyPoints = async (
         result[rosterId].starterPoints.push(starterPoints);
         result[rosterId].benchPlayers.push(benchPlayers);
         result[rosterId].benchPoints.push(benchPoints);
+        if (missingPlayerScores !== undefined) {
+          const row = result[rosterId];
+          row.missingPlayerScores ??= [];
+          row.missingPlayerScores[row.points.length - 1] = missingPlayerScores;
+        }
         return result;
       },
       {} as Record<number, PointsType>

@@ -80,7 +80,11 @@ const changeTab = (tab: LeagueFeature) => {
   ) {
     router.replace({ path: "/", query: defaultRouteQuery.value });
   }
-  if (tab === "Advisor") router.replace({path:"/",query:{...defaultRouteQuery.value,destination:"advisor"}});
+  if (tab === "Advisor")
+    router.replace({
+      path: "/",
+      query: { ...defaultRouteQuery.value, destination: "advisor" },
+    });
   store.currentTab = tab;
   preferenceStorage.setItem("currentTab", tab);
   closeMobileSidebar();
@@ -106,17 +110,43 @@ const featureIcons: Record<LeagueFeature, Component> = {
   ESPN: ChartColumn,
 };
 
+const groups = [
+  {
+    label: "This week",
+    ids: ["Home", "Advisor", "Weekly Report", "Start/Sit"],
+  },
+  {
+    label: "League performance",
+    ids: [
+      "Standings",
+      "Power Rankings",
+      "Expected Wins",
+      "Roster Management",
+      "Playoffs",
+      "Season Forecast",
+    ],
+  },
+  {
+    label: "Build & explore",
+    ids: [
+      "Player Values",
+      "Trade Lab",
+      "Draft",
+      "League History",
+      "Manager Profiles",
+      "Wrapped",
+    ],
+  },
+];
 const data = computed(() => ({
-  navMain: [
-    {
-      items: sidebarLeagueFeatures
-        .filter(({ id }) => store.isLeagueFeatureVisible(id))
-        .map(({ id: title }) => ({
-          title,
-          icon: featureIcons[title],
-        })),
-    },
-  ],
+  navMain: groups.map((group) => ({
+    label: group.label,
+    items: sidebarLeagueFeatures
+      .filter(
+        ({ id }) => group.ids.includes(id) && store.isLeagueFeatureVisible(id),
+      )
+      .map(({ id: title }) => ({ title, icon: featureIcons[title] })),
+  })),
 }));
 </script>
 
@@ -147,7 +177,8 @@ const data = computed(() => ({
       class="mr-2 mt-2 data-[orientation=vertical]:h-4"
     />
     <SidebarContent>
-      <SidebarGroup v-for="item in data.navMain">
+      <SidebarGroup v-for="item in data.navMain" :key="item.label">
+        <p class="nav-group-label">{{ item.label }}</p>
         <SidebarGroupContent>
           <SidebarMenu>
             <SidebarMenuItem
@@ -163,12 +194,12 @@ const data = computed(() => ({
                 @click="changeTab(childItem.title)"
                 class="cursor-pointer"
               >
-                <div>
+                <button type="button">
                   <component :is="childItem.icon" v-if="childItem.icon" />
                   <p>
                     {{ childItem.title }}
                   </p>
-                </div>
+                </button>
               </SidebarMenuButton>
               <SidebarMenuButton
                 v-else-if="
@@ -183,18 +214,17 @@ const data = computed(() => ({
                 @click="changeTab(childItem.title)"
                 class="cursor-pointer"
               >
-                <div>
+                <button type="button">
                   <component :is="childItem.icon" v-if="childItem.icon" />
                   <p>
                     {{ childItem.title }}
                   </p>
-                </div>
+                </button>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>
-
     </SidebarContent>
     <SidebarRail />
   </Sidebar>

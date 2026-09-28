@@ -108,7 +108,7 @@ const createShareLink = () => {
         <DialogDescription>
           <template v-if="shareUrl"> Share it with your league. </template>
           <template v-else>
-            Choose the extra cards your league will see with the full Premium
+            Choose the extra cards your league will see with the full
             report.
           </template>
         </DialogDescription>
@@ -161,7 +161,7 @@ const createShareLink = () => {
               <Check class="size-3.5" />
             </span>
             <div class="flex-1 min-w-0 mt-4">
-              <p class="text-sm font-semibold">Full Premium report</p>
+              <p class="text-sm font-semibold">Full report</p>
               <p class="text-xs leading-5 text-muted-foreground">
                 Headlines, recaps, and analysis.
               </p>

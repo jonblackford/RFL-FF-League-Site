@@ -39,7 +39,7 @@ import { Badge } from "@/components/ui/badge";
               Build a plan for your own draft room
             </h2>
             <p class="max-w-2xl mt-2 text-sm leading-6 text-muted-foreground">
-              Premium unlocks draft-room scouting across every Sleeper and ESPN
+              Explore draft-room scouting across every Sleeper and ESPN
               league you manage.
             </p>
           </div>

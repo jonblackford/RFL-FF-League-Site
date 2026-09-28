@@ -2,6 +2,7 @@ import type { LeagueFeature } from "@/lib/features";
 
 export const leagueFeatureDestinations = [
   "advisor",
+  "weekly_report",
   "player_values",
   "trade_finder",
 ] as const;
@@ -11,6 +12,7 @@ export type LeagueFeatureDestination =
 
 const destinationTabs = {
   advisor: "Advisor",
+  weekly_report: "Weekly Report",
   player_values: "Player Values",
   trade_finder: "Trade Lab",
 } as const satisfies Record<LeagueFeatureDestination, LeagueFeature>;

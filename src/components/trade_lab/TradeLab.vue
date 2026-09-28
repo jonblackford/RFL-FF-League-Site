@@ -6,6 +6,7 @@ import { TableDataType } from "../../types/types.ts";
 import { useStore } from "../../store/store";
 import {
   estimateLocalTradeQuote,
+  getPlayerValue as getTradePlayerValue,
   type TradeSuggestion,
 } from "@/lib/tradeFinder";
 import {
@@ -73,7 +74,7 @@ const demoSuggestionsByRoster = ref<
 >();
 const demoStarterPlayerIdsByRoster = ref<Record<number, string[]>>({});
 const loading = ref(false);
-const playerValueAccess = ref<"preview" | "premium">("preview");
+const playerValueAccess = ref<"preview" | "premium" | "full">("preview");
 const tradeValueRequest = ref<TradeValueRequestPayload | null>(null);
 const tradeQuote = ref<TradeQuoteResponse | null>(null);
 const quoteLoading = ref(false);
@@ -628,22 +629,6 @@ const gapBandLabel = computed(() => {
   return "";
 });
 
-const getTradePlayerValue = (player: TradeLabPlayer) => {
-  if (Number.isFinite(player.tradeValue) && Number(player.tradeValue) > 0) {
-    return Number(player.tradeValue);
-  }
-  if (Number.isFinite(player.dynastyAdp) && Number(player.dynastyAdp) > 0) {
-    return Math.max(1, 120 - Number(player.dynastyAdp));
-  }
-  if (Number.isFinite(player.overallRank) && player.overallRank > 0) {
-    return Math.max(1, 110 - player.overallRank);
-  }
-  if (Number.isFinite(player.positionRank) && player.positionRank > 0) {
-    return Math.max(1, 65 - player.positionRank);
-  }
-  return 1;
-};
-
 const getDraftPickTradeValue = (pick: TradeDraftPickAsset) => {
   const roundValues = [0, 48, 30, 18, 10, 6, 3];
   return roundValues[pick.round] ?? Math.max(1, 8 - pick.round);
@@ -708,6 +693,9 @@ watch(
 
     const timer = window.setTimeout(() => {
       if (currentRequestId !== quoteRequestId) return;
+      if ([...teamAOutgoingPlayers.value,...teamBOutgoingPlayers.value].some(p=>p.dataAvailable===false)) {
+        tradeQuote.value=null; quoteError.value='A selected player has no recorded scoring history. Compare roster fit with the advisor before valuing this trade.'; return;
+      }
       const teamAValue = getLocalPackageValue({
         players: teamAOutgoingPlayers.value,
         picks: teamAPicks.value,
@@ -1024,7 +1012,7 @@ onBeforeUnmount(() => {
                     :overall-rank="player.overallRank"
                     :dynasty-adp="player.dynastyAdp"
                     :show-dynasty-adp="
-                      dynasty && playerValueAccess !== 'premium'
+                      dynasty && playerValueAccess === 'preview'
                     "
                   />
                 </div>
@@ -1127,7 +1115,7 @@ onBeforeUnmount(() => {
                       :overall-rank="player.overallRank"
                       :dynasty-adp="player.dynastyAdp"
                       :show-dynasty-adp="
-                        dynasty && playerValueAccess !== 'premium'
+                        dynasty && playerValueAccess === 'preview'
                       "
                     />
                   </div>
@@ -1235,7 +1223,7 @@ onBeforeUnmount(() => {
                       :overall-rank="player.overallRank"
                       :dynasty-adp="player.dynastyAdp"
                       :show-dynasty-adp="
-                        dynasty && playerValueAccess !== 'premium'
+                        dynasty && playerValueAccess === 'preview'
                       "
                     />
                   </div>
@@ -1354,7 +1342,7 @@ onBeforeUnmount(() => {
                     :overall-rank="player.overallRank"
                     :dynasty-adp="player.dynastyAdp"
                     :show-dynasty-adp="
-                      dynasty && playerValueAccess !== 'premium'
+                      dynasty && playerValueAccess === 'preview'
                     "
                   />
                 </div>
@@ -1366,18 +1354,7 @@ onBeforeUnmount(() => {
       <div
         class="pt-3 mt-4 text-xs border-t border-border text-muted-foreground"
       >
-        <template v-if="dynasty && playerValueAccess !== 'premium'">
-          Dynasty ADP is a raw Sleeper market baseline. Premium adds POS/OVR
-          rankings adjusted for your league's scoring and roster format.
-        </template>
-        <template v-else-if="dynasty">
-          POS/OVR badges use balanced dynasty rankings adjusted for your
-          league's scoring and roster format.
-        </template>
-        <template v-else>
-          POS/OVR badges use standard Sleeper season rankings. Premium adds
-          rankings adjusted for your league's scoring and roster format.
-        </template>
+        Rankings use recorded league production when available. Dynasty ADP is a separate market baseline; neither guarantees future results.
       </div>
     </div>
   </Card>

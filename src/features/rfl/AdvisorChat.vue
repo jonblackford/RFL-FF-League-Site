@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount } from "vue";
+import { advisorAnalysisModes } from "../advisor/intelligence";
 import { requestGeminiAnswer } from "./gemini";
 import {
   advisorApiKey,
@@ -107,26 +108,8 @@ async function ask(prompt?: string) {
       displayed evidence.
     </p>
     <div class="ad-actions">
-      <button
-        :disabled="loading || disabled"
-        @click="ask('Explain my best lineup changes and uncertainties.')"
-      >
-        Explain lineup</button
-      ><button
-        :disabled="loading || disabled"
-        @click="
-          ask(
-            'Which waiver alternative helps most, and what is the cost of the drop?',
-          )
-        "
-      >
-        Prioritize waivers</button
-      ><button
-        :disabled="loading || disabled"
-        @click="ask('Build a practical weekly plan using this evidence.')"
-      >
-        Weekly plan</button
-      ><button @click="reset">New conversation</button>
+      <button v-for="mode in advisorAnalysisModes" :key="mode.id" :disabled="loading || disabled" @click="ask(mode.question)">{{ mode.label }}</button>
+      <button @click="reset">New conversation</button>
     </div>
     <div class="ad-messages" aria-live="polite">
       <article

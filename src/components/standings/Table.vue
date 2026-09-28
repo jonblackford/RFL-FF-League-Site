@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FeatureGuide from "@/components/layout/FeatureGuide.vue";
 import { preferenceStorage } from "@/lib/storage";
 import { maxBy, minBy } from "@/lib/collection";
 import { createTableData } from "../../api/helper";
@@ -331,7 +332,8 @@ const getTeamName = (tableDataItem: TableDataType) => {
 };
 </script>
 <template>
-  <div :class="['min-w-0', store.currentTab === 'Home' ? '' : 'mx-4']">
+  <div :class="['league-workspace min-w-0', store.currentTab === 'Home' ? '' : 'mx-4']">
+    <FeatureGuide :rows="tableData" />
     <AdvisorDashboard v-if="store.currentTab === 'Advisor'" />
     <PreviousSeasonPrompt v-if="showStandingsTab && store.currentLeagueId" />
     <div

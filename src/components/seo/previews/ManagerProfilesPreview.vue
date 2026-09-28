@@ -15,7 +15,7 @@ const metrics = [
   <ProductPreviewFrame
     title="Manager Profiles"
     eyebrow="Fourth & Long · 4 seasons"
-    status="Premium sample"
+    status="Sample"
   >
     <div class="p-4 sm:p-5">
       <div class="flex items-center gap-3">

@@ -23,3 +23,15 @@ No paid billing, hosting upgrade, or fantasy transaction was activated. A live G
 ## Requested navigation cleanup
 
 Removed About, Changelog, Privacy Policy, Terms of Service and Account from the shipped routes/navigation. Removed footer links and account-only purchase CTAs. Old URLs redirect to the main site while preserving league/provider/season. No entitlement or paid backend authorization was bypassed.
+
+## Free tools, AI integration and consistent presentation
+
+Repaired Weekly Report and Player Values by removing their dependency on missing report/valuation services. Public reports, draft-room scouting and manager/rivalry explanations no longer require a subscription. Replaced stale premium marketing and consolidated AI explanations in the shared advisor.
+
+Added Advisor Insights using adapted fantasy-football-ai workflows and original Fantasy-Intelligence-inspired evidence safeguards. Added a shared visual system, grouped sidebar and metric guides across the workspace. Weekly reports now include per-week notes and a PDF-ready print view, alongside text/image exports. See [the full source review and implementation boundaries](source-integration-audit.md).
+
+Rulings: preserve existing specialized charts while unifying their surrounding layout; adapt analysis workflows without activating unvalidated research models; use native browser Save as PDF for Unicode-safe, paginated local export without another paid service. These choices preserve working analytics and static hosting; the tradeoff is that PDF export uses the print dialog and the imported research projects do not run as separate applications.
+
+Final review corrections preserve missing score coverage through the Sleeper import and keep valid zero values from falling back to rank-based prices. Older cached bench zeroes without coverage metadata remain unknown until refreshed. Both were reproduced in failing regression checks before correction.
+
+Release validation: 452 unit tests, 17 browser tests (one opt-in live test skipped in the standard suite), three data-refresh tests, production and Pages builds. Five Pages browser checks including the opt-in live RFL Advisor check passed separately. Live RFL weekly results, Player Values and PDF opening were also verified without browser errors. The exported two-page report was rendered and visually checked.

@@ -1,27 +1,23 @@
 <script setup lang="ts">
-import { LockKeyhole } from "@lucide/vue";
-import { computed, ref, watch } from "vue";
+
+import { computed, ref } from "vue";
 
 import type { ManagerArchetype } from "@/lib/narratives";
 import Card from "@/components/ui/card/Card.vue";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import FreeDraftFeatures from "./FreeDraftFeatures.vue";
 import AuctionDraftFeatures from "./AuctionDraftFeatures.vue";
-import LockedPremiumDraftPreview from "./LockedPremiumDraftPreview.vue";
+
 import PremiumAuctionDraftFeatures from "./PremiumAuctionDraftFeatures.vue";
 import PremiumDraftFeatures from "./PremiumDraftFeatures.vue";
 
-const props = withDefaults(
-  defineProps<{
+const props = defineProps<{
     archetypes: ManagerArchetype[];
     draftRoomArchetypes?: ManagerArchetype[];
     leagueSize?: number;
     draftType?: string;
     auctionBudget?: number;
-    isPremium?: boolean;
-  }>(),
-  { isPremium: false }
-);
+  }>();
 const isAuction = computed(() => props.draftType?.toLowerCase() === "auction");
 
 const hasDraftHistory = computed(() =>
@@ -42,7 +38,7 @@ const hasDraftRoomData = computed(() =>
   )
 );
 
-const activeView = ref(props.isPremium ? "draft-room" : "tendencies");
+const activeView = ref("draft-room");
 
 const activeTitle = computed(() =>
   activeView.value === "draft-room"
@@ -57,7 +53,7 @@ const activeTitle = computed(() =>
 const activeDescription = computed(() => {
   if (activeView.value === "tendencies") {
     return isAuction.value
-      ? "Each manager’s budget allocation, premium-player appetite, position spending, and endgame habits."
+      ? "Each manager’s budget allocation, early-player spending, position spending, and endgame habits."
       : "Each manager’s draft day habits, favorite early-round positions, and historical draft rankings.";
   }
   if (!hasDraftRoomData.value) {
@@ -65,31 +61,11 @@ const activeDescription = computed(() => {
       ? "Auction scouting becomes available after completed auction history is imported for a current league manager."
       : "Draft Room scouting becomes available after completed draft history is imported for a current league manager.";
   }
-  if (props.isPremium) {
-    return isAuction.value
-      ? "Build a budget plan and scout how every league mate spends."
-      : "Plan your draft and scout every league mate from one workspace.";
-  }
   return isAuction.value
-    ? "Your auction history is ready to shape a budget plan and identify position competition."
-    : "Your draft history is ready to plan your next draft and scout your league mates.";
+    ? "Build a budget plan and scout how every league mate spends."
+    : "Plan your draft and scout every league mate from one workspace.";
 });
 
-const showPremiumSubscriptionCta = computed(
-  () =>
-    activeView.value === "draft-room" &&
-    hasDraftRoomData.value &&
-    !props.isPremium
-);
-
-
-
-watch(
-  () => props.isPremium,
-  (isPremium, wasPremium) => {
-    if (isPremium && !wasPremium) activeView.value = "draft-room";
-  }
-);
 </script>
 
 <template>
@@ -125,10 +101,7 @@ watch(
           <h2 class="heading-section">{{ activeTitle }}</h2>
           <p class="max-w-2xl mt-4 text-sm sm:text-base text-muted-foreground">
             {{ activeDescription }}
-            <template v-if="showPremiumSubscriptionCta">
-              Available with a
-              .
-            </template>
+
           </p>
         </div>
         <TabsList class="self-start">
@@ -137,11 +110,7 @@ watch(
           </TabsTrigger>
           <TabsTrigger value="draft-room" class="gap-1.5">
             Draft Room
-            <LockKeyhole
-              v-if="!isPremium && hasDraftRoomData"
-              class="inline-block mb-1 mr-1 size-3"
-              aria-hidden="true"
-            />
+
           </TabsTrigger>
         </TabsList>
       </div>
@@ -172,23 +141,19 @@ watch(
           </p>
         </div>
         <PremiumAuctionDraftFeatures
-          v-else-if="activeView === 'draft-room' && isPremium && isAuction"
+          v-else-if="activeView === 'draft-room' && isAuction"
           :archetypes="draftRoomManagers"
           :auction-budget="auctionBudget"
           embedded
         />
         <PremiumDraftFeatures
-          v-else-if="activeView === 'draft-room' && isPremium"
+          v-else-if="activeView === 'draft-room'"
           :archetypes="archetypes"
           :draft-room-archetypes="draftRoomArchetypes"
           :league-size="leagueSize"
           embedded
         />
-        <LockedPremiumDraftPreview
-          v-else-if="activeView === 'draft-room' && hasDraftRoomData"
-          :archetypes="draftRoomManagers"
-          :is-auction="isAuction"
-        />
+
       </TabsContent>
     </Tabs>
   </Card>

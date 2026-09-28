@@ -294,6 +294,8 @@ export type PointsType = {
   starterNames?: any[][];
   benchPlayers: (string | null)[][];
   benchPoints: number[][];
+  /** IDs without an actual score, aligned by week. Absent on older caches. */
+  missingPlayerScores?: string[][];
   benchNames?: any[][];
 };
 
@@ -377,6 +379,8 @@ export type TableDataType = {
   benchNames?: Player[][];
   benchPlayers: string[][];
   benchPoints: number[][];
+  /** IDs without an actual score, aligned by week. Absent on older caches. */
+  missingPlayerScores?: string[][];
 };
 
 export type PowerRankingEntry = {

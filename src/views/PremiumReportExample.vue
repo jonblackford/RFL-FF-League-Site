@@ -68,12 +68,12 @@ const reportNotes = [
               <ArrowLeft :size="15" /> Weekly recap guide
             </RouterLink>
             <div class="max-w-4xl mt-7">
-              <Badge variant="secondary">Premium report example</Badge>
+              <Badge variant="secondary">Report example</Badge>
               <h1 class="mt-5 text-4xl font-semibold tracking-tight text-pretty sm:text-5xl">
                 Fantasy football weekly recap example: Week 11
               </h1>
               <p class="max-w-3xl mt-5 text-lg leading-8 text-muted-foreground">
-                A complete sample Premium report for a Sleeper league, including all six Week 11 matchup scores and the stories that connected them.
+                A complete sample report for a Sleeper league, including all six Week 11 matchup scores and the stories that connected them.
               </p>
             </div>
           </div>
